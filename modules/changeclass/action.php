@@ -35,6 +35,12 @@
 //include_once( 'extension/expchangeclass/classes/functions.php' );
 
 
+// The conversion engine is loaded explicitly. Upstream left this commented out
+// and relied on the class turning up in the generated extension autoload array,
+// so on any installation where that had not been regenerated the module died
+// with "Class conversionFunctions not found". __DIR__ keeps it correct whatever
+// the working directory is.
+require_once( __DIR__ . '/../../classes/functions.php' );
 $http = eZHTTPTool::instance();
 $Module = $Params["Module"];
 

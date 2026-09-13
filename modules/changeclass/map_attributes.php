@@ -24,6 +24,12 @@
 //
 
 
+// The conversion engine is loaded explicitly. Upstream left this commented out
+// and relied on the class turning up in the generated extension autoload array,
+// so on any installation where that had not been regenerated the module died
+// with "Class conversionFunctions not found". __DIR__ keeps it correct whatever
+// the working directory is.
+require_once( __DIR__ . '/../../classes/functions.php' );
 $Module = $Params['Module'];
 $http = eZHTTPTool::instance();
 
@@ -32,17 +38,41 @@ $sourceNodeID       = $http->postVariable( 'SourceNodeID' );
 $destinationClassID = $http->postVariable( 'DestinationClassID' );
 $ini = eZINI::instance( 'changeclass.ini' );
 
+// Every one of these was dereferenced without a check, so a stale form, a
+// deleted object or a class removed between the two steps of the wizard was a
+// fatal rather than a message.
 $sourceObject = eZContentObject::fetch( $sourceObjectID );
-$sourceClassID = $sourceObject->ClassID;
+if ( !$sourceObject instanceof eZContentObject )
+{
+    eZDebug::writeError( "Source object '$sourceObjectID' not found", __FILE__ );
+    return $Module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel' );
+}
+
+$sourceClassID = $sourceObject->attribute( 'contentclass_id' );
 $sourceClass = eZContentClass::fetch( $sourceClassID );
+if ( !$sourceClass instanceof eZContentClass )
+{
+    eZDebug::writeError( "Source class '$sourceClassID' not found", __FILE__ );
+    return $Module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel' );
+}
+
+$destinationClass = eZContentClass::fetch( $destinationClassID );
+if ( !$destinationClass instanceof eZContentClass )
+{
+    eZDebug::writeError( "Destination class '$destinationClassID' not found", __FILE__ );
+    return $Module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel' );
+}
+
 $warnings = array();
 
 // checking children
 $sourceNode = eZContentObjectTreeNode::fetch( $sourceNodeID );
-if (!is_object( $sourceNode ))
-    return false;
+if ( !$sourceNode instanceof eZContentObjectTreeNode )
+{
+    eZDebug::writeError( "Source node '$sourceNodeID' not found", __FILE__ );
+    return $Module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel' );
+}
 $sourceChildrenCount = $sourceNode->attribute( 'children_count' );
-$destinationClass = eZContentClass::fetch( $destinationClassID );
 if ( $sourceClass->attribute( 'is_container' ) == 1
 		&& $destinationClass->attribute( 'is_container' ) == 0 )
 {
@@ -57,7 +87,6 @@ $lost_attributes = array();
 $i = 0;
 
 $additionalAttributeMap = array();
-$converter = new conversionFunctions();
 foreach ( $sourceClass->dataMap() as $sourceClassAttr )
 {
 
@@ -78,7 +107,7 @@ foreach ( $sourceClass->dataMap() as $sourceClassAttr )
     if ( !in_array( $sourceClassAttr->DataTypeString, $destinationDataTypeArray ) )
     {
         // Don't give warning if it's possible to make simple conversion
-        $simpleConversion = $converter->getSimpleConversionArray();
+        $simpleConversion = conversionFunctions::getSimpleConversionArray();
         foreach ( $destinationDataTypeArray as $destinationDataType )
         {
             if ( isset( $simpleConversion[$sourceClassAttr->DataTypeString] ) && in_array( $destinationDataType, $simpleConversion[$sourceClassAttr->DataTypeString] ) )

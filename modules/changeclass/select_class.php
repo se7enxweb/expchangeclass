@@ -33,14 +33,20 @@ $userID = $Params['Parameters'][0];
 
 $sourceNodeID = $Module->ViewParameters[0];
 $node = eZContentObjectTreeNode::fetch( $sourceNodeID );
-if ( !is_object( $node ) )
+if ( !$node instanceof eZContentObjectTreeNode )
 {
-    return false;
+    eZDebug::writeError( "Node '$sourceNodeID' not found", __FILE__ );
+    return $Module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel' );
 }
-$sourceObjectID = $node->ContentObjectID;
+$sourceObjectID = $node->attribute( 'contentobject_id' );
 
 $sourceObject = eZContentObject::fetch( $sourceObjectID );
-$sourceClassID = $sourceObject->ClassID;
+if ( !$sourceObject instanceof eZContentObject )
+{
+    eZDebug::writeError( "Source object '$sourceObjectID' not found", __FILE__ );
+    return $Module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel' );
+}
+$sourceClassID = $sourceObject->attribute( 'contentclass_id' );
 
 
 $tpl = eZTemplate::factory();
