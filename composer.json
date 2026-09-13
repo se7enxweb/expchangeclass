@@ -1,0 +1,35 @@
+{
+    "name": "se7enxweb/expchangeclass",
+    "description": "expChangeClass - change an existing content object's content class, mapping each attribute of the old class onto one of the new, from the administration interface or the command line. A hardened fork of eZChangeclass for Exponential Legacy / Exponential 6 on PHP 8.",
+    "type": "ezpublish-legacy-extension",
+    "keywords": [
+        "Exponential",
+        "Exponential Legacy",
+        "content class",
+        "conversion",
+        "migration",
+        "changeclass"
+    ],
+    "homepage": "https://se7enx.com",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": "^8.1 || ^8.2 || ^8.3 || ^8.4"
+    },
+    "extra": {
+        "ezpublish-legacy-extension-name": "expchangeclass"
+    },
+    "authors": [
+        {
+            "name": "7x",
+            "homepage": "https://se7enx.com"
+        },
+        {
+            "name": "Bartek Modzelewski",
+            "role": "Original author of eZChangeclass"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/se7enxweb/expchangeclass/issues",
+        "source": "https://github.com/se7enxweb/expchangeclass"
+    }
+}

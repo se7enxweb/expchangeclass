@@ -1,0 +1,78 @@
+Changelog for eZ ChangeClass extension
+*fixed +added -removed
+
+1.0
+  * a lot of fixes and cleaning, official new release
+  * fixes and improvements in batch converting including reduced memory consumption
+
+0.70
+  + support for multilangual object
+
+0.61 (ar)
+  * conversionFunctions::getSimpleConversionArray is using $this so can not be called statically
+  * lots of missing is_set / isset checks in map_attribute.php and map_attribute.tpl on arrays
+
+0.60 (ar)
+  * fixed while bug in cli script
+  * Fixed possible 'mem leak'
+  + added ezstring / eztext -> ezxml converter (thanks Mauro Innocenti)
+  + added ezstring to ezint / ezfloat converter (untested!)
+  Known bug: Duplicated relations with object relation(s) attributes
+
+
+0.51 (ar)
+* fixed offset bug
+* fixed 3.8.x api bug
++ added sub-tree parameter
++ added logging capability
+
+0.50 (ar)
++ Added batch converting ability with wizard
+* some other small fixes
++ added lichens text and ezinfo.php
+
+0.31
+* included patch from Peter Putzer
+
+0.30
++ Added simple conversion - now it's possible to define conversion in changeclass.ini
+[SimpleConversion]
+SupportedConversion[]=eztext;ezstring
+Above settings will enable mapping between different datatypes when there is no need to make any changes on attribute content 
+
+0.23 (ar)
++ Added possibility to have custom datatype converters, one example is included where relationslist is converted to a 'relationlistbloc' witch is a relationlist with dates on each relation.
+* Fixed some bugs / warnings
+
+0.19
+* Possibility to change existing object to different content class - button "Modify object"
+
+0.1
++ Initial release
+expchangeclass 1.0.0
+====================
+Fork of eZChangeclass for Exponential Legacy / Exponential 6 on PHP 8, taking
+the OpenContent fork as its base and the mapping pre-selection from the Netgen
+fork.
+
+- Conversion runs in one transaction and rolls back as a unit. Failures no
+  longer leave an object with some attributes moved and the rest not, and the
+  contentclass_id change moved inside the transaction.
+- die() inside the attribute loop replaced with exceptions, so a failure can be
+  rolled back and reported instead of ending the request mid-write.
+- The attribute mapping is validated against both class data maps before
+  anything is written.
+- convertObject() takes an out parameter for the failure reason and its result
+  is honoured by the module and the batch script.
+- classconvert.php pages correctly: the window steps over objects that failed,
+  which previously made the loop repeat the same batch forever.
+- Parameter file parsing rejects malformed and blank lines.
+- Text to ezxmltext conversion escapes the value first; content containing an
+  ampersand or an angle bracket no longer produces invalid xml.
+- Relation list to bloc converter rewritten on DOMDocument, replacing the
+  removed PHP 4 eZXML API.
+- changeclass.ini declared [ezstring] twice, which made ezstring to ezxmltext
+  unreachable. One group per source datatype now, dispatching on destination.
+- Converter methods declared static, matching how they are invoked.
+- changeclass/convert policy function added to all three views.
+- Caches cleared every batch pass, not only on non-quiet runs.

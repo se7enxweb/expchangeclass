@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" requires="ezpublish 6.0">
+  <name>expchangeclass</name>
+  <summary>expChangeClass - change an existing content object's content class, mapping each attribute of the old class onto one of the new, from the administration interface or the command line</summary>
+  <version>1.0.0</version>
+  <copyright>7x</copyright>
+  <license>GNU General Public License v2.0 (or any later version)</license>
+  <author>7x</author>
+</extension>

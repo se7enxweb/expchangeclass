@@ -1,0 +1,7 @@
+expchangeclass
+
+To do:
+- removing old verion
+- support for reverse related objects
+- check permisions!!
+
