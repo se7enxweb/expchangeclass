@@ -1,5 +1,5 @@
  <hr/>
-    <a id="menu-class-change" href="#" onmouseover="ezpopmenu_mouseOver( 'ContextMenu' )"
+    <a id="menu-class-change-sub" href="#" onmouseover="ezpopmenu_mouseOver( 'SubitemsContextMenu' )"
        onclick="ezpopmenu_submitForm( 'menu-form-class-change-sub' ); return false;">{"Change content class"|i18n("design/admin/changeclass")}</a>
 
 
