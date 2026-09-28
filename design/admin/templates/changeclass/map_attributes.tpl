@@ -14,7 +14,7 @@
 
 <div class="box-header"><div class="box-tc"><div class="box-ml"><div class="box-mr"><div class="box-tl"><div class="box-tr">
 
-<h1 class="context-title">Change object content class &lt;{$node.name|wash()}&gt; [{$node.class_name}]</h1>
+<h1 class="context-title">{'Change object content class &lt;%name&gt; [%class_name]'|i18n( 'design/admin/changeclass/map_attributes',, hash( '%name', $node.name|wash(), '%class_name', $node.class_name ) )}</h1>
 
 <div class="header-mainline"></div>
 </div></div></div></div></div></div>
@@ -24,16 +24,16 @@
 <div class="context-attributes">
 
     {if $warnings}
-    <div>Warnings:
+    <div>{'Warnings:'|i18n( 'design/admin/changeclass/map_attributes' )}
         <ul>
         {if is_set($warnings.unsupported_datatypes)}
-            <li class="message-error">Destination class has at least one unsupported datatype. You can't use this class.</li>
+            <li class="message-error">{'Destination class has at least one unsupported datatype. You can\'t use this class.'|i18n( 'design/admin/changeclass/map_attributes' )}</li>
         {/if}
         {if is_set($warnings.no_children)}
-            <li>Destination class is not configured to be container!</li>
+            <li>{'Destination class is not configured to be container!'|i18n( 'design/admin/changeclass/map_attributes' )}</li>
         {/if}
         {if is_set($warnings.lost_attributes)}
-            <li>The following attributes can not be mapped:
+            <li>{'The following attributes can not be mapped:'|i18n( 'design/admin/changeclass/map_attributes' )}
                 <ul>
                 {foreach $warnings.lost_attributes as $attr}
                     <li>{$attr.name} ({$attr.datatype})</li>
@@ -44,7 +44,7 @@
         </ul>
     </div>
     {else}
-    <div>No warnigs for this operation</div>
+    <div>{'No warnigs for this operation'|i18n( 'design/admin/changeclass/map_attributes' )}</div>
     {/if}
 
 
@@ -58,7 +58,7 @@
 
 <div class="box-tc"><div class="box-bl"><div class="box-br">
 <div class="block">
-    <input class="button" type="submit" name="SelectSourceObjectButton" value="Back to destination class selection" />
+    <input class="button" type="submit" name="SelectSourceObjectButton" value="{'Back to destination class selection'|i18n( 'design/admin/changeclass/map_attributes' )}" />
 </div>
 </div></div></div>
 
@@ -78,7 +78,7 @@
 
 <div class="box-header"><div class="box-tc"><div class="box-ml"><div class="box-mr"><div class="box-tl"><div class="box-tr">
 
-<h2 class="context-title">Attributes mapping</h2>
+<h2 class="context-title">{'Attributes mapping'|i18n( 'design/admin/changeclass/map_attributes' )}</h2>
 
 <div class="header-subline"></div>
 
@@ -89,15 +89,15 @@
 
 <table class="list" cellspacing="0">
   <tr>
-    <th>Source class ({$source_class.0.name})</th>
-    <th>Destination class ({$destination_class.0.name})</th>
+    <th>{'Source class (%source_class)'|i18n( 'design/admin/changeclass/map_attributes',, hash( '%source_class', $source_class.0.name ) )}</th>
+    <th>{'Destination class (%destination_class)'|i18n( 'design/admin/changeclass/map_attributes',, hash( '%destination_class', $destination_class.0.name ) )}</th>
   </tr>
 {def $iter=0}
 {foreach $destination_class_attributes as $dest_attribute sequence array( 'bglight', 'bgdark' ) as $style}
   <tr class="{$style}">
     <td>
     <select name="SourceAttribute[{$dest_attribute.identifier}]">
-        <option value="">(leave empty)</option>
+        <option value="">{'(leave empty)'|i18n( 'design/admin/changeclass/map_attributes' )}</option>
     {set $iter=0}
     {foreach $source_class_attributes as $source_attribute}
         {if or( eq( $source_attribute.data_type_string, $dest_attribute.data_type_string ),
@@ -119,14 +119,14 @@
 </table>
 
     <div class="block">
-        <label>Options:</label>
+        <label>{'Options:'|i18n( 'design/admin/changeclass/map_attributes' )}</label>
 
 
-    <div><input type="checkbox" name="KeepOwnerAndDate" checked="checked" />Keep original object creator and creation date</div>
+    <div><input type="checkbox" name="KeepOwnerAndDate" checked="checked" />{'Keep original object creator and creation date'|i18n( 'design/admin/changeclass/map_attributes' )}</div>
     {if gt( $node.children_count, 0 )}
-    <div><input type="checkbox" name="CopyChildren" {if is_set($warnings.no_children)}disabled="disabled"{else}checked="checked"{/if} />Add source object's children to new object</div>
+    <div><input type="checkbox" name="CopyChildren" {if is_set($warnings.no_children)}disabled="disabled"{else}checked="checked"{/if} />{'Add source object\'s children to new object'|i18n( 'design/admin/changeclass/map_attributes' )}</div>
     {/if}
-    <div><input type="checkbox" name="GenerateConsoleParameters" />Generate parameters for converting all instancees of this class</div>
+    <div><input type="checkbox" name="GenerateConsoleParameters" />{'Generate parameters for converting all instancees of this class'|i18n( 'design/admin/changeclass/map_attributes' )}</div>
     </div>
 
 </div>
@@ -138,7 +138,7 @@
 <div class="block">
 
     <div class="button-right">
-        <input class="button button-important" type="submit" name="ModifyObjectContentClassButton" value="Modify Object" />
+        <input class="button button-important" type="submit" name="ModifyObjectContentClassButton" value="{'Modify Object'|i18n( 'design/admin/changeclass/map_attributes' )}" />
        {* <input class="button" type="submit" name="ChangeObjectContentClassButton" value="Copy Object" />*}
     </div>
     <div class="break"></div>
