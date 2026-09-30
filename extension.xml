@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <extension xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" requires="ezpublish 6.0">
-  <name>expchangeclass</name>
+  <name>Exponential Change Class</name>
   <summary>expChangeClass - change an existing content object's content class, mapping each attribute of the old class onto one of the new, from the administration interface or the command line</summary>
   <version>1.0.2</version>
   <copyright>7x</copyright>
