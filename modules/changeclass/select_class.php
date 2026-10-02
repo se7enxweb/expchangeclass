@@ -23,47 +23,5 @@
 //
 //
 
-include_once( 'kernel/common/template.php' );
-include_once( "lib/ezutils/classes/ezhttptool.php" );
-include_once( 'kernel/classes/ezcontentobject.php' );
-$Module = $Params['Module'];
-$http = eZHTTPTool::instance();
-
-$userID = $Params['Parameters'][0];
-
-$sourceNodeID = $Module->ViewParameters[0];
-$node = eZContentObjectTreeNode::fetch( $sourceNodeID );
-if ( !$node instanceof eZContentObjectTreeNode )
-{
-    eZDebug::writeError( "Node '$sourceNodeID' not found", __FILE__ );
-    return $Module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel' );
-}
-$sourceObjectID = $node->attribute( 'contentobject_id' );
-
-$sourceObject = eZContentObject::fetch( $sourceObjectID );
-if ( !$sourceObject instanceof eZContentObject )
-{
-    eZDebug::writeError( "Source object '$sourceObjectID' not found", __FILE__ );
-    return $Module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel' );
-}
-$sourceClassID = $sourceObject->attribute( 'contentclass_id' );
-
-
-$tpl = eZTemplate::factory();
-$tpl->setVariable( 'source_class_id', $sourceClassID );
-$tpl->setVariable( 'source_object_id', $sourceObjectID );
-$tpl->setVariable( 'source_node_id', $sourceNodeID );
-
-$Result = array();
-$Result['content'] = $tpl->fetch( 'design:changeclass/select_class.tpl' );
-$Result['path'] = array( array( 'url' => false,
-                                'text' => 'Select destination class' ) );
-
-
-
-
-
-
-
-
-?>
+// The code is in extension/expchangeclass/classes/runnable/views/changeclass/select_class.php (#207); this file is the entry point.
+return \Exponential\View\Extension\Expchangeclass\Changeclass\SelectClass::main( __FILE__, get_defined_vars() );
