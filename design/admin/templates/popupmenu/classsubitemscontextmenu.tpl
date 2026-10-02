@@ -1,3 +1,5 @@
+{* Only for a user who may change classes: every changeclass view needs changeclass/convert *}
+{if fetch( 'user', 'has_access_to', hash( 'module', 'changeclass', 'function', 'convert' ) )}
  <hr/>
     <a id="menu-class-change-sub" href="#" onmouseover="ezpopmenu_mouseOver( 'SubitemsContextMenu' )"
        onclick="ezpopmenu_submitForm( 'menu-form-class-change-sub' ); return false;">{"Change content class"|i18n("design/admin/changeclass")}</a>
@@ -8,3 +10,4 @@
   <input type="hidden" name="ObjectID" value="%objectID%" />
   <input type="hidden" name="SelectSourceObjectButton" value="submit" />
 </form>
+{/if}
