@@ -16,7 +16,7 @@ class expchangeclassInfo
     public static function info()
     {
         return array( 'Name' => "Exponential Change Class",
-                      'Version' => "1.0.4",
+                      'Version' => "1.0.5",
                       'Copyright' => "Copyright (C) 1998 - 2026 7x. All rights reserved.",
                       'License' => "GNU General Public License v2.0 (or any later version)",
                       'info_url' => "https://github.com/se7enxweb/expchangeclass",
