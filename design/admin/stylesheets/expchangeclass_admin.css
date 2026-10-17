@@ -1,0 +1,15 @@
+/* expchangeclass: the admin styles of the extension, bundled by the ezjscore packer
+   ([StylesheetSettings] BackendCSSFileList[] in settings/design.ini.append.php). The templates carry no inline CSS:
+   a Content-Security-Policy without 'unsafe-inline' drops style="" attributes. Colors and spacing come from the
+   admin tokens (--a4-*), which follow dark mode; the values after the comma are for a design without them. */
+
+/* the result of a conversion (changeclass/action.tpl): the shared .a4-notice with .is-ok or .is-bad gives the colors,
+   this keeps the spacing of the earlier boxes around it */
+.exp-cc-notice {
+    margin: var(--a4-space-4, 1em);
+    padding: var(--a4-space-4, 1em);
+    border-style: solid;
+    border-width: 2px;
+}
+.exp-cc-notice-bad { border-color: var(--a4-bad, currentColor); }
+.exp-cc-notice-ok { border-color: var(--a4-ok, currentColor); }

@@ -15,12 +15,12 @@
 {* The conversion result, stated plainly. It used to be discarded, so a refused
    or rolled back conversion produced exactly the same page as a successful one. *}
 {if $converted|not}
-<div style="padding: 1em; border: 2px solid red; margin: 1em;">
+<div class="a4-notice is-bad exp-cc-notice exp-cc-notice-bad" role="alert">
 {'<b>The object was NOT converted.</b> Nothing was changed; the content is exactly as it was.'|i18n( 'design/admin/changeclass/action' )}
 {if $conversion_error}<br /><br />{'Reason:'|i18n( 'design/admin/changeclass/action' )} {$conversion_error|wash}{/if}
 </div><br />
 {else}
-<div style="padding: 1em; border: 2px solid green; margin: 1em;">
+<div class="a4-notice is-ok exp-cc-notice exp-cc-notice-ok" role="status">
 {'The object was converted to \'%dest_class_name\'.'|i18n( 'design/admin/changeclass/action',, hash( '%dest_class_name', $dest_class_name|wash ) )}
 </div><br />
 {/if}
@@ -28,7 +28,7 @@
 {'A file with all params for this convertion has been created in \'%convert_file_path\' and can be used for batch convertions of all remaining (%source_object_count objects) \'%source_class_name\' to class \'%dest_class_name\'.'|i18n( 'design/admin/changeclass/action',, hash( '%convert_file_path', $convert_file_path, '%source_object_count', $source_object_count, '%source_class_name', $source_class_name, '%dest_class_name', $dest_class_name ) )}<br /><br />
 
 {if $convert_file_ok|not}
-<div style="padding: 1em; border: 2px solid red; margin: 1em;">
+<div class="a4-notice is-bad exp-cc-notice exp-cc-notice-bad" role="alert">
 {'<b>ERROR:</b> eZFile could not store parameter file!'|i18n( 'design/admin/changeclass/action' )}<br /> {'Do you have write access to path (%convert_file_path)?'|i18n( 'design/admin/changeclass/action',, hash( '%convert_file_path', $convert_file_path ) )}
 </div><br />
 {/if}
