@@ -45,7 +45,7 @@ php extension/expchangeclass/scripts/classconvert.php -s {$current_siteaccess} -
 <div>
 <i>{'Content of convert \'paramfile\' (%convert_file_name):'|i18n( 'design/admin/changeclass/action',, hash( '%convert_file_name', $convert_file_name ) )}</i><br />
 <pre>
-{$convert_file_content}
+{$convert_file_content|wash}
 </pre>
 </div>
 
