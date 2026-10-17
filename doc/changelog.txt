@@ -1,6 +1,10 @@
 Changelog for eZ ChangeClass extension
 *fixed +added -removed
 
+1.0.9
+  * the "Change content class" entries of the context menus declare their form in data-menu-form; expchangeclass_menu.js
+    submits it with an older ezpopupmenu.js, without onclick or onmouseover attributes (Content Security Policy)
+
 1.0
   * a lot of fixes and cleaning, official new release
   * fixes and improvements in batch converting including reduced memory consumption
