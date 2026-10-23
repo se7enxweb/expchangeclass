@@ -49,7 +49,7 @@
     </message>
     <message>
         <source>Continue to new object</source>
-        <translation>Przejdź do nowego obiektu</translation>
+        <translation>Przejść do nowego obiektu</translation>
     </message>
 </context>
 <context>
@@ -80,7 +80,7 @@
     </message>
     <message>
         <source>Back to destination class selection</source>
-        <translation>Wróć do wyboru klasy docelowej</translation>
+        <translation>Wrócić do wyboru klasy docelowej</translation>
     </message>
     <message>
         <source>Attributes mapping</source>
@@ -104,19 +104,19 @@
     </message>
     <message>
         <source>Keep original object creator and creation date</source>
-        <translation>Zachowaj pierwotnego twórcę obiektu i datę utworzenia</translation>
+        <translation>Zachować pierwotnego twórcę obiektu i datę utworzenia</translation>
     </message>
     <message>
         <source>Add source object&apos;s children to new object</source>
-        <translation>Dodaj elementy podrzędne obiektu źródłowego do nowego obiektu</translation>
+        <translation>Dodać elementy podrzędne obiektu źródłowego do nowego obiektu</translation>
     </message>
     <message>
         <source>Generate parameters for converting all instancees of this class</source>
-        <translation>Wygeneruj parametry do konwersji wszystkich instancji tej klasy</translation>
+        <translation>Wygenerować parametry do konwersji wszystkich instancji tej klasy</translation>
     </message>
     <message>
         <source>Modify Object</source>
-        <translation>Zmień obiekt</translation>
+        <translation>Zmienić obiekt</translation>
     </message>
 </context>
 <context>
@@ -171,14 +171,14 @@
     </message>
     <message>
         <source>Select</source>
-        <translation>Wybierz</translation>
+        <translation>Wybrać</translation>
     </message>
 </context>
 <context>
     <name>design/admin/changeclass</name>
     <message>
         <source>Change content class</source>
-        <translation>Zmień klasę treści</translation>
+        <translation>Zmienić klasę treści</translation>
     </message>
 </context>
 </TS>
