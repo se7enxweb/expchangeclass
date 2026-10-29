@@ -18,4 +18,4 @@ Modzelewski, released under the GNU General Public License v2.0. The attribute
 pre-selection in the mapping form and parts of the packaging derive from the
 Netgen fork of the same work.
 
-Modifications copyright (C) 1998 - 2026 7x. All rights reserved.
+Modifications Copyright (C) 1998 - 2026 Exponential Foundation and 7x. All rights reserved.

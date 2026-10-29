@@ -3,7 +3,7 @@
 // expchangeclass - change an existing content object's content class, mapping each
 // attribute of the old class onto one of the new. A hardened fork of eZChangeclass
 // by Bartek Modzelewski, for Exponential Legacy / Exponential 6 on PHP 8.
-// Copyright (C) 1998 - 2026 7x. All rights reserved.
+// Copyright (C) 1998 - 2026 Exponential Foundation and 7x. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@ class expchangeclassInfo
     {
         return array( 'Name' => "Exponential Change Class",
                       'Version' => "1.0.11",
-                      'Copyright' => "Copyright (C) 1998 - 2026 7x. All rights reserved.",
+                      'Copyright' => "Copyright (C) 1998 - 2026 Exponential Foundation and 7x. All rights reserved.",
                       'License' => "GNU General Public License v2.0 (or any later version)",
                       'Info_url' => "https://github.com/se7enxweb/expchangeclass",
                       'Includes' => array(
