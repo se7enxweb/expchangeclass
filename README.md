@@ -138,8 +138,11 @@ See [doc/USAGE.md](doc/USAGE.md).
 ## Before you run it
 
 Conversion rewrites published content in place, across every version and
-language. It is not undo-able from the interface. **Take a database backup
-first**, and try it on one object before a batch.
+language. Since 1.1.0 every change is previewed first, runs in one transaction
+and keeps a restore point that undoes it ([doc/restore-points.md](doc/restore-points.md)).
+Editors get the policies with `./console exp:addchangeclasspolicies --apply`
+([doc/policies.md](doc/policies.md)). The pages are described in
+[doc/index.md](doc/index.md).
 
 ## Licence
 

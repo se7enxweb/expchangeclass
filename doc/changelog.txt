@@ -1,6 +1,24 @@
 Changelog for eZ ChangeClass extension
 *fixed +added -removed
 
+1.1.0
+  + a preview before every class change (changeclass/map_attributes/<node>/<class>): per attribute of the new class
+    the old one it takes its content from, how (carried over, converted, copied, empty), the content per language,
+    what is dropped, what refuses the change and what an editor should know; only what was previewed is applied
+  + restore points: every attribute and relation row of the object written before the change; Restore and Discard on
+    changeclass/result and changeclass/dashboard, exp:changeclass --restore/--discard/--purge
+  + policies changeclass/convert, restore (Class, NewClass, Section, Node, Subtree), bulk (Class, NewClass) and
+    administrate; exp:addchangeclasspolicies and the button "Allow editors to change classes" give the Editor role
+    convert and restore (no duplicates, --revoke)
+  + exp:changeclass (dry run unless --apply, --format=json); changeclass/bulk as a content job; the migration step
+    type change_class; audit names; "Verify it's you" before applying, restoring, discarding and the policy buttons
+  * every version and language the object has rows for is converted (a translation outside the siteaccess languages
+    kept attributes of the old class); converters and copies read the source row as stored; relation rows follow
+    their attribute; caches and the search index entry are renewed after a change
+  * the pages use the shared admin components in every admin design, light and dark; composer.json allows PHP 8.5
+  - the extension's own stylesheets and the parameter file page
+
+
 1.0.9
   * the "Change content class" entries of the context menus declare their form in data-menu-form; expchangeclass_menu.js
     submits it with an older ezpopupmenu.js, without onclick or onmouseover attributes (Content Security Policy)

@@ -1,40 +1,18 @@
 # Using expchangeclass
 
-Conversion rewrites published content in place, across every version and every
-language of the object. **Take a database backup before you start**, and convert
-one object before you convert a class.
-
-## Converting one object
-
-1. In the administration interface, browse to the object.
-2. Open the context menu on the node and choose **Change class**.
-3. Pick the destination class.
-4. Map the attributes, then confirm.
-
-The mapping form lists every attribute of the destination class with a dropdown
-of the source attributes. Each row pre-selects the source attribute whose
-identifier matches the destination; change it where the identifiers differ.
-
-Leave a row empty to create that destination attribute with no content. Any
-source attribute you do not map is **removed** from the object.
-
-The same source attribute may be mapped onto several destination attributes; the
-extra copies are created from its content.
-
-The result page states whether the content changed. If it did not, it says why
-and nothing was written.
+The pages of the administration are described in [Change class](index.md): one object with its preview and restore
+point, the overview, the bulk change as a background job, and the policies for editors. This page covers the parameter
+files of the older batch script, the datatype converters and calling the conversion from code.
 
 ## Converting every object of a class
 
-The confirmation page writes a parameter file into the cache directory and shows
-the command to run. It looks like this:
+`./console exp:changeclass --from=<class> --class=<class> [--subtree=<node>] --apply` does it with a preview and a
+restore point per object ([Bulk changes and the command line](bulk-and-command-line.md)). The older script still
+works, and goes through the same plan and restore point:
 
 ```
 php extension/expchangeclass/scripts/classconvert.php -s <siteaccess> --param-file=<file>
 ```
-
-Use the siteaccess you were just working in, so the script uses the same
-database and cache directory.
 
 ### Options
 
@@ -158,6 +136,4 @@ attribute empty.
 
 ## Permissions
 
-The three views are gated on `changeclass/convert`. Grant that policy to the
-roles allowed to convert content; it is not implied by general content edit
-access.
+The views are gated on the policies of [Policies for editors](policies.md).
