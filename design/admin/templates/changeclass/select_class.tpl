@@ -1,129 +1,98 @@
-{def $node=fetch( 'content', 'node', hash( 'node_id', $source_node_id ) )
-     $source_class_attributes=fetch( 'class', 'attribute_list', hash( 'class_id', $source_class_id ) )
-     $classes=fetch( 'class', 'list' )
-     
-}
+{* changeclass/select_class/<NodeID>: step 1 of a class change, in every admin design (admin, admin3, admin4, admin4l
+   and the designs built on them). Only the shared components of components.css and the --a4-* tokens; no inline
+   CSS or script. Variables: node, object, source_class, facts (expChangeClassService::facts()), classes (id,
+   identifier, name, group, allowed), allowed_count, can_convert, restore_points, message. *}
+<div class="context-block a4-page">
 
+<div class="box-header"><div class="box-ml">
+<h1 class="context-title"><span class="a4-icon a4-bi-diagram-3 is-large" aria-hidden="true"></span> {'Change the class of %name'|i18n( 'extension/expchangeclass',, hash( '%name', $node.name ) )|wash}</h1>
+</div></div>
 
-<form action={"changeclass/map_attributes"|ezurl} method="post" >
-<input type="hidden" name="SourceObjectID" value="{$source_object_id}" />
-<input type="hidden" name="SourceNodeID" value="{$source_node_id}" />
+<div class="box-bc"><div class="box-ml"><div class="box-content">
 
-<div class="context-block">
+{include uri='design:changeclass/parts/steps.tpl' step=1}
 
-<div class="box-header"><div class="box-tc"><div class="box-ml"><div class="box-mr"><div class="box-tl"><div class="box-tr">
+<p class="a4-intro">{'The object keeps its id, its locations, its versions and its languages; only its class changes. The next step shows exactly what happens to each attribute before anything is written, and a restore point lets you undo the change.'|i18n( 'extension/expchangeclass' )}</p>
 
-<h1 class="context-title">{'Change object content class &lt;%name&gt; [%class_name]'|i18n( 'design/admin/changeclass/select_class',, hash( '%name', $node.name|wash(), '%class_name', $node.class_name ) )}</h1>
+{include uri='design:changeclass/parts/message.tpl' message=$message}
 
-<div class="header-mainline"></div>
+<div class="a4-stack">
 
-</div></div></div></div></div></div>
+<section class="a4-card" aria-labelledby="exp-cc-object-title">
+    <div class="a4-card-head"><h2 class="a4-h3" id="exp-cc-object-title">{'The object now'|i18n( 'extension/expchangeclass' )}</h2></div>
+    <dl class="a4-facts">
+        <div><dt>{'Name'|i18n( 'extension/expchangeclass' )}</dt><dd><a href={$node.url_alias|ezurl}>{$node.name|wash}</a></dd></div>
+        <div><dt>{'Class'|i18n( 'extension/expchangeclass' )}</dt><dd>{$source_class.name|wash} <span class="a4-tag is-mono">{$source_class.identifier|wash}</span></dd></div>
+        <div><dt>{'Object ID'|i18n( 'extension/expchangeclass' )}</dt><dd>{$object.id}</dd></div>
+        <div><dt>{'Versions'|i18n( 'extension/expchangeclass' )}</dt><dd>{$facts.object.versions|count}</dd></div>
+        <div><dt>{'Languages'|i18n( 'extension/expchangeclass' )}</dt><dd><span class="a4-badges">{foreach $facts.object.languages as $language}<span class="a4-tag is-mono">{$language|wash}</span>{/foreach}</span></dd></div>
+        <div><dt>{'Sub-items'|i18n( 'extension/expchangeclass' )}</dt><dd>{$node.children_count}</dd></div>
+        <div><dt>{'Objects relating to it'|i18n( 'extension/expchangeclass' )}</dt><dd>{$facts.reverse_relations}</dd></div>
+        <div><dt>{'Modified'|i18n( 'extension/expchangeclass' )}</dt><dd>{$object.modified|l10n( 'shortdatetime' )}</dd></div>
+    </dl>
+    <details class="a4-fold">
+        <summary>{'Attributes of %class (%count)'|i18n( 'extension/expchangeclass',, hash( '%class', $source_class.name, '%count', $facts.source_class.attributes|count ) )|wash}</summary>
+        <div class="a4-fold-body">
+        <ul class="a4-plain">{foreach $facts.source_class.attributes as $attribute}<li>{$attribute.name|wash} <span class="a4-tag is-mono">{$attribute.identifier|wash}</span> <span class="a4-tag">{$attribute.datatype|wash}</span></li>{/foreach}</ul>
+        </div>
+    </details>
+</section>
 
-<div class="box-ml"><div class="box-mr"><div class="box-content">
-
-<div class="context-attributes">
-
-    <table class="list" cellspacing="0">
-        <tr>
-            <th><label>{'General object\'s informations'|i18n( 'design/admin/changeclass/select_class' )}</label></th>
-        </tr>
-        <tr>
-            <td>
-
-    <div class="block">
-        <label>{'Content class name:'|i18n( 'design/admin/changeclass/select_class' )}</label>
-        {$node.class_name}
+<form method="post" action={concat( 'changeclass/select_class/', $node.node_id )|ezurl}>
+<section class="a4-card" aria-labelledby="exp-cc-class-title">
+    <div class="a4-card-head"><h2 class="a4-h3" id="exp-cc-class-title">{'The new class'|i18n( 'extension/expchangeclass' )}</h2></div>
+    {if $allowed_count|gt( 0 )}
+    <div class="a4-form">
+        <div class="a4-field">
+            <label for="exp-cc-class">{'Change into'|i18n( 'extension/expchangeclass' )}</label>
+            {def $current_group = '-' $group_open = false()}
+            <select id="exp-cc-class" name="DestinationClassID" required="required">
+            {foreach $classes as $class}{if $class.allowed}
+                {if ne( $class.group, $current_group )}{if $group_open}</optgroup>{/if}<optgroup label="{if $class.group}{$class.group|wash}{else}{'Other'|i18n( 'extension/expchangeclass' )|wash}{/if}">{set $current_group = $class.group}{set $group_open = true()}{/if}
+                <option value="{$class.id}">{$class.name|wash} ({$class.identifier|wash})</option>
+            {/if}{/foreach}
+            {if $group_open}</optgroup>{/if}
+            </select>
+            {undef $current_group $group_open}
+            {if $allowed_count|lt( $classes|count )}<p class="a4-help">{'%count classes are left out: your role does not allow changing this object into them.'|i18n( 'extension/expchangeclass',, hash( '%count', sub( $classes|count, $allowed_count ) ) )|wash}</p>{/if}
+        </div>
     </div>
+    {else}
+    <p class="a4-empty">{'Your role does not allow changing this object into any class (policy changeclass/convert).'|i18n( 'extension/expchangeclass' )}</p>
+    {/if}
+</section>
 
-    <div class="block">
-        <label>{'Children count:'|i18n( 'design/admin/changeclass/select_class' )}</label>
-        {$node.children_count}
+<div class="a4-toolbar">
+    <p class="a4-meta">{'Nothing is changed yet.'|i18n( 'extension/expchangeclass' )}</p>
+    <div class="a4-actions">
+        <button class="a4-btn" type="submit" name="CancelButton" value="1" formnovalidate="formnovalidate">{'Cancel'|i18n( 'extension/expchangeclass' )}</button>
+        {if $allowed_count|gt( 0 )}<button class="a4-btn a4-btn-primary" type="submit" name="SelectDestinationClassButton" value="1">{'Continue to the mapping'|i18n( 'extension/expchangeclass' )}</button>{/if}
     </div>
+</div>
+</form>
 
-    <div class="block">
-        <label>{'Languages:'|i18n( 'design/admin/changeclass/select_class' )}</label>
-        {foreach $node.object.languages as $lang}
-            {delimiter}&nbsp;{/delimiter}
-            <img src="{$lang.locale|flag_icon}" alt="{$lang.language_code|wash}" />&nbsp;
-        {/foreach}
-    </div>
-    {*
-    <div class="block">
-        <label>Location:</label>
-        {$node.main_node_id}
-    </div>
-      *}
-    <div class="block">
-        <label>{'Current version:'|i18n( 'design/admin/changeclass/select_class' )}</label>
-        {$node.contentobject_version}
-    </div>
-
-    <div class="block">
-        {def $related_objects=fetch( 'content', 'related_objects', hash( 'object_id', $node.contentobject_id ) )}
-        <label>{'Related objects [%count]:'|i18n( 'design/admin/changeclass/select_class',, hash( '%count', $related_objects|count() ) )}</label>
-        {if $related_objects}
-            {foreach $related_objects as $related_object}
-                {$related_object.name}{delimiter}, {/delimiter}
-            {/foreach}
-        {else}
-            {'no objects'|i18n( 'design/admin/changeclass/select_class' )}
-        {/if}
-    </div>
-
-    <div class="block">
-        {def $reverse_related_objects=fetch( 'content', 'reverse_related_objects', hash( 'object_id', $node.contentobject_id ) )}
-        <label>{'Reverse related objects [%count]:'|i18n( 'design/admin/changeclass/select_class',, hash( '%count', $reverse_related_objects|count() ) )}</label>
-        {if $reverse_related_objects}
-            {foreach $reverse_related_objects as $reverse_related_object}
-                {$reverse_related_object.name}{delimiter}, {/delimiter}
-            {/foreach}
-        {else}
-            {'no objects'|i18n( 'design/admin/changeclass/select_class' )}
-        {/if}
-    </div>
-
-    <div class="block">
-        <label>{'Attributes (datatype):'|i18n( 'design/admin/changeclass/select_class' )}</label>
-        {foreach $source_class_attributes as $attribute}
-
-            {$attribute.name} ({$attribute.data_type_string}) <br />
-        {/foreach}
-    </div>
-
-
-            </td>
-        </tr>
+{if $restore_points}
+<section class="a4-card" aria-labelledby="exp-cc-history-title">
+    <div class="a4-card-head"><h2 class="a4-h3" id="exp-cc-history-title">{'Earlier class changes of this object'|i18n( 'extension/expchangeclass' )}</h2></div>
+    <div class="a4-table-wrap">
+    <table class="a4-table">
+    <thead><tr><th scope="col">{'When'|i18n( 'extension/expchangeclass' )}</th><th scope="col">{'Change'|i18n( 'extension/expchangeclass' )}</th><th scope="col">{'State'|i18n( 'extension/expchangeclass' )}</th></tr></thead>
+    <tbody>
+    {foreach $restore_points as $point}
+    <tr>
+        <td><a href={concat( 'changeclass/result/', $point.id )|ezurl}>{$point.created|l10n( 'shortdatetime' )}</a></td>
+        <td>{$point.source_class.name|wash} &rarr; {$point.dest_class.name|wash}</td>
+        <td>{include uri='design:changeclass/parts/state.tpl' state=$point.state}</td>
+    </tr>
+    {/foreach}
+    </tbody>
     </table>
+    </div>
+</section>
+{/if}
+
 </div>
 
 </div></div></div>
 
-<div class="controlbar">
-<div class="box-bc"><div class="box-ml"><div class="box-mr"><div class="box-tc"><div class="box-bl"><div class="box-br">
-<div class="block">
-
-    <label>{'Destination content class:'|i18n( 'design/admin/changeclass/select_class' )}</label>
-    <br />
-    {* A class whose serialized_name_list has no value for any of the siteaccess
-       languages resolves to an empty name, which rendered a row that could be
-       selected but read as blank. Fall back to the identifier so every row is
-       always identifiable, and never offer the class the object already is. *}
-    <select name="DestinationClassID">
-    {foreach $classes as $class}
-        {if ne( $class.id, $source_class_id )}
-        <option value="{$class.id}">{if $class.name|trim|ne('')}{$class.name|wash}{else}{'%identifier (unnamed)'|i18n( 'design/admin/changeclass/select_class',, hash( '%identifier', $class.identifier|wash ) )}{/if}</option>
-        {/if}
-    {/foreach}
-
-</select>
-
-<input class="button" type="submit" name="SelectDestinationClassButton" value="{'Select'|i18n( 'design/admin/changeclass/select_class' )}" />
-
 </div>
-</div></div></div></div></div></div>
-</div>
-
-</div>
-</form>
-
-{*$node|attribute(show)*}

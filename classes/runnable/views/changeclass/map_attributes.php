@@ -1,7 +1,20 @@
 <?php
 /**
- * The code of extension/expchangeclass/modules/changeclass/map_attributes.php, moved into a class (#207 stage 1). The file extension/expchangeclass/modules/changeclass/map_attributes.php is one call to it.
- * Guide: doc/bc/6.0/cli_cronjob_view_abstractions.md
+ * changeclass/map_attributes/<NodeID>/<ClassID>: step 2 of a class change. The mapping (an old attribute for each
+ * attribute of the new class) with the preview of what the change does: the data carried over or converted per
+ * language, what is dropped, what refuses the change and what an editor should know.
+ *
+ * POST (always answered with a 303 back to this address or on):
+ *   PreviewButton   the posted mapping is kept and previewed
+ *   ApplyButton     the change, when the posted token is the preview's (the object or mapping did not change since):
+ *                   restore point, one transaction, caches, search index, audit; then changeclass/result/<id>.
+ *                   "Verify it's you" asks first (site.ini [ReauthGroup_changeclass]).
+ *   BackButton      back to the class choice
+ *   CancelButton    back to the object
+ * The form of the earlier versions (SourceObjectID, SourceNodeID, DestinationClassID) is sent on to the address.
+ *
+ * @copyright Copyright (C) 1998 - 2026 Exponential Foundation and 7x. All rights reserved.
+ * @license GNU General Public License v2.0 (or any later version)
  */
 
 namespace Exponential\View\Extension\Expchangeclass\Changeclass
@@ -11,143 +24,76 @@ class MapAttributes extends \Exponential\Runnable\ModuleView
 {
     public function run( array $scope )
     {
-        // the including function's variables ($Params, $Module, $cli, ...)
-        foreach ( array_keys( $scope ) as $__name )
-            if ( $__name !== 'this' && $__name !== 'scope' )
-                ${$__name} = &$scope[$__name];
-        unset( $__name );
-
-        require_once( $this->scriptDir() . '/../../classes/functions.php' );
+        $Params = $scope['Params'];
         $Module = $Params['Module'];
         $http = \eZHTTPTool::instance();
 
-        $sourceObjectID     = $http->postVariable( 'SourceObjectID' );
-        $sourceNodeID       = $http->postVariable( 'SourceNodeID' );
-        $destinationClassID = $http->postVariable( 'DestinationClassID' );
-        $ini = \eZINI::instance( 'changeclass.ini' );
+        $nodeID = isset( $Params['NodeID'] ) ? (int)$Params['NodeID'] : 0;
+        $classID = isset( $Params['ClassID'] ) ? (int)$Params['ClassID'] : 0;
+        // the form of the earlier versions posted here without view parameters
+        if ( !$nodeID && $http->hasPostVariable( 'SourceNodeID' ) && $http->hasPostVariable( 'DestinationClassID' ) )
+            return \expChangeClassView::redirect( $Module, 'changeclass/map_attributes/' . (int)$http->postVariable( 'SourceNodeID' ) . '/' . (int)$http->postVariable( 'DestinationClassID' ) );
 
-        // Every one of these was dereferenced without a check, so a stale form, a
-        // deleted object or a class removed between the two steps of the wizard was a
-        // fatal rather than a message.
-        $sourceObject = \eZContentObject::fetch( $sourceObjectID );
-        if ( !$sourceObject instanceof \eZContentObject )
-        {
-            \eZDebug::writeError( "Source object '$sourceObjectID' not found", $this->scriptFile() );
-            return $this->viewResult( isset( $Result ) ? $Result : null,  $Module->handleError( \eZError::KERNEL_NOT_AVAILABLE, 'kernel' ) );
-        }
+        $node = \eZContentObjectTreeNode::fetch( $nodeID );
+        if ( !$node instanceof \eZContentObjectTreeNode || !$node->attribute( 'can_read' ) )
+            return $Module->handleError( \eZError::KERNEL_NOT_AVAILABLE, 'kernel' );
+        $object = $node->attribute( 'object' );
+        $here = 'changeclass/map_attributes/' . $nodeID . '/' . $classID;
+        $key = $nodeID . '/' . $classID;
 
-        $sourceClassID = $sourceObject->attribute( 'contentclass_id' );
-        $sourceClass = \eZContentClass::fetch( $sourceClassID );
-        if ( !$sourceClass instanceof \eZContentClass )
-        {
-            \eZDebug::writeError( "Source class '$sourceClassID' not found", $this->scriptFile() );
-            return $this->viewResult( isset( $Result ) ? $Result : null,  $Module->handleError( \eZError::KERNEL_NOT_AVAILABLE, 'kernel' ) );
-        }
+        if ( $http->hasPostVariable( 'CancelButton' ) )
+            return \expChangeClassView::redirect( $Module, $node->attribute( 'url_alias' ) );
+        if ( $http->hasPostVariable( 'BackButton' ) )
+            return \expChangeClassView::redirect( $Module, 'changeclass/select_class/' . $nodeID );
 
-        $destinationClass = \eZContentClass::fetch( $destinationClassID );
-        if ( !$destinationClass instanceof \eZContentClass )
+        $posted = \expChangeClassView::postedMapping();
+        if ( $posted !== null && $http->hasPostVariable( 'ApplyButton' ) )
         {
-            \eZDebug::writeError( "Destination class '$destinationClassID' not found", $this->scriptFile() );
-            return $this->viewResult( isset( $Result ) ? $Result : null,  $Module->handleError( \eZError::KERNEL_NOT_AVAILABLE, 'kernel' ) );
-        }
-
-        $warnings = array();
-
-        // checking children
-        $sourceNode = \eZContentObjectTreeNode::fetch( $sourceNodeID );
-        if ( !$sourceNode instanceof \eZContentObjectTreeNode )
-        {
-            \eZDebug::writeError( "Source node '$sourceNodeID' not found", $this->scriptFile() );
-            return $this->viewResult( isset( $Result ) ? $Result : null,  $Module->handleError( \eZError::KERNEL_NOT_AVAILABLE, 'kernel' ) );
-        }
-        $sourceChildrenCount = $sourceNode->attribute( 'children_count' );
-        if ( $sourceClass->attribute( 'is_container' ) == 1
-        		&& $destinationClass->attribute( 'is_container' ) == 0 )
-        {
-            $warnings['no_children'] = true;
-        }
-        // checking lost attributes
-        foreach ( $destinationClass->dataMap() as $attr )
-        {
-            $destinationDataTypeArray[] = $attr->DataTypeString;
-        }
-        $lost_attributes = array();
-        $i = 0;
-
-        $additionalAttributeMap = array();
-        foreach ( $sourceClass->dataMap() as $sourceClassAttr )
-        {
-
-            if ( $ini->hasGroup( $sourceClassAttr->DataTypeString ) )
+            \expChangeClassView::keepMapping( $key, $posted );
+            $token = $http->hasPostVariable( 'PlanToken' ) ? (string)$http->postVariable( 'PlanToken' ) : '';
+            if ( $token === '' )
             {
-                //In case it's a custom convertion script for this datatype, we need to search for that
-                $possible_dest = $ini->variable( $sourceClassAttr->DataTypeString, 'SupportedDestination' );
-                if ( !is_array( $possible_dest ) ) $possible_dest = array( $possible_dest );
-                $additionalAttributeMap[$sourceClassAttr->DataTypeString] = $possible_dest;
-                foreach( $possible_dest as $p_dest )
-                {
-                    if ( in_array( $p_dest, $destinationDataTypeArray ) )
-                    {
-                        continue 2;
-                    }
-                }
+                \expChangeClassView::flash( 'warn', \ezpI18n::tr( 'extension/expchangeclass', 'Preview the change before applying it.' ) );
+                return \expChangeClassView::redirect( $Module, $here );
             }
-            if ( !in_array( $sourceClassAttr->DataTypeString, $destinationDataTypeArray ) )
+            $result = \expChangeClassService::apply( $object, $classID, $posted, array( 'token' => $token, 'via' => 'admin' ) );
+            if ( $result['ok'] )
             {
-                // Don't give warning if it's possible to make simple conversion
-                $simpleConversion = \conversionFunctions::getSimpleConversionArray();
-                foreach ( $destinationDataTypeArray as $destinationDataType )
-                {
-                    if ( isset( $simpleConversion[$sourceClassAttr->DataTypeString] ) && in_array( $destinationDataType, $simpleConversion[$sourceClassAttr->DataTypeString] ) )
-                    {
-                        continue 2;
-                    }
-                }
-                if ( isset( $sourceClassAttr->Name)) $lost_attributes[$i]['name'] = $sourceClassAttr->Name;
-                else $lost_attributes[$i]['name'] = $sourceClassAttr->Identifier;
-                $lost_attributes[$i]['datatype'] = $sourceClassAttr->DataTypeString;
-                $i++;
+                \expChangeClassView::flash( 'ok', \ezpI18n::tr( 'extension/expchangeclass', 'The class was changed.' ) );
+                return \expChangeClassView::redirect( $Module, 'changeclass/result/' . $result['restore_point'] );
             }
+            $lines = array();
+            foreach ( $result['errors'] as $error )
+                $lines[] = \expChangeClassView::translate( $error );
+            \expChangeClassView::flash( !empty( $result['stale'] ) ? 'warn' : 'bad',
+                                        !empty( $result['stale'] ) ? \ezpI18n::tr( 'extension/expchangeclass', 'Nothing was changed: check the new preview.' )
+                                                                    : \ezpI18n::tr( 'extension/expchangeclass', 'The class was not changed. The content is exactly as it was.' ),
+                                        $lines );
+            return \expChangeClassView::redirect( $Module, $result['restore_point'] !== '' ? 'changeclass/result/' . $result['restore_point'] : $here );
         }
-        if ( $i > 0 )
+        if ( $posted !== null )
         {
-            $warnings['lost_attributes'] = $lost_attributes;
+            \expChangeClassView::keepMapping( $key, $posted );
+            return \expChangeClassView::redirect( $Module, $here );
         }
 
-        // checking for unsupported datatypes
-        $unsupported = $ini->variable( 'General', 'UnsupportedDataTypeArray' );
-        $unsupportedDataTypes = array();
-        foreach ( $unsupported as $datatype )
-        {
-            if ( in_array( $datatype, $destinationDataTypeArray ) )
-                $unsupportedDataTypes[] = $datatype;
-        }
-        if ( !empty( $unsupportedDataTypes ) )
-        {
-            $warnings['unsupported_datatypes'] = $unsupportedDataTypes;
-        }
+        $plan = \expChangeClassService::preview( $object, $classID, \expChangeClassView::keptMapping( $key ) );
+        if ( !$plan['dest_class'] )
+            return $Module->handleError( \eZError::KERNEL_NOT_AVAILABLE, 'kernel' );
+        $translated = \expChangeClassView::translatePlan( $plan );
 
-        //echo "<pre>";
-        //print_r( $unsupportedDataTypes );
-        //print_r(  $sourceDataTypeArray );
-        //echo "</pre>";
-
-
-
-        $tpl = \eZTemplate::factory();
-        $tpl->setVariable( 'source_class_id', $sourceClassID );
-        $tpl->setVariable( 'source_object_id', $sourceObjectID );
-        $tpl->setVariable( 'source_node_id', $sourceNodeID );
-        $tpl->setVariable( 'destination_class_id', $destinationClassID );
-        $tpl->setVariable( 'additional_attribute_map', $additionalAttributeMap );
-        $tpl->setVariable( 'warnings', $warnings );
-
-        $Result = array();
-        $Result['content'] = $tpl->fetch( 'design:changeclass/map_attributes.tpl' );
-        $Result['path'] = array( array( 'url' => false,
-                                        'text' => 'Attributes mapping' ) );
-
-        return $this->viewResult( isset( $Result ) ? $Result : null, null );
+        return \expChangeClassView::page( 'map_attributes', array(
+            'node' => $node,
+            'object' => $object,
+            'plan' => $plan,
+            'errors' => $translated['errors'],
+            'warnings' => $translated['warnings'],
+            'source_class' => $plan['source_class'],
+            'dest_class' => $plan['dest_class'],
+            'facts' => $plan['facts'],
+            'command' => \expChangeClassView::command( $object->attribute( 'id' ), $plan['dest_class']->attribute( 'identifier' ), $plan['mapping'] ),
+            'form_uri' => $here,
+        ), \expChangeClassView::path( \ezpI18n::tr( 'extension/expchangeclass', 'Map the attributes' ), $node ) );
     }
 }
 

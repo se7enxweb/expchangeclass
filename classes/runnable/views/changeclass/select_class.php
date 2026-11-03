@@ -1,7 +1,11 @@
 <?php
 /**
- * The code of extension/expchangeclass/modules/changeclass/select_class.php, moved into a class (#207 stage 1). The file extension/expchangeclass/modules/changeclass/select_class.php is one call to it.
- * Guide: doc/bc/6.0/cli_cronjob_view_abstractions.md
+ * changeclass/select_class/<NodeID>: step 1 of a class change. What the object is (class, versions, languages,
+ * drafts, sub-items, relations) and the class it should become. A POST with SelectDestinationClassButton goes on to
+ * changeclass/map_attributes/<NodeID>/<ClassID> (303).
+ *
+ * @copyright Copyright (C) 1998 - 2026 Exponential Foundation and 7x. All rights reserved.
+ * @license GNU General Public License v2.0 (or any later version)
  */
 
 namespace Exponential\View\Extension\Expchangeclass\Changeclass
@@ -11,49 +15,53 @@ class SelectClass extends \Exponential\Runnable\ModuleView
 {
     public function run( array $scope )
     {
-        // the including function's variables ($Params, $Module, $cli, ...)
-        foreach ( array_keys( $scope ) as $__name )
-            if ( $__name !== 'this' && $__name !== 'scope' )
-                ${$__name} = &$scope[$__name];
-        unset( $__name );
-
-        include_once( 'kernel/common/template.php' );
-        include_once( "lib/ezutils/classes/ezhttptool.php" );
-        include_once( 'kernel/classes/ezcontentobject.php' );
+        $Params = $scope['Params'];
         $Module = $Params['Module'];
         $http = \eZHTTPTool::instance();
 
-        $userID = $Params['Parameters'][0];
+        $nodeID = isset( $Params['NodeID'] ) ? (int)$Params['NodeID'] : 0;
+        if ( !$nodeID && $http->hasPostVariable( 'NodeID' ) )
+            $nodeID = (int)$http->postVariable( 'NodeID' );
+        $node = \eZContentObjectTreeNode::fetch( $nodeID );
+        if ( !$node instanceof \eZContentObjectTreeNode || !$node->attribute( 'can_read' ) )
+            return $Module->handleError( \eZError::KERNEL_NOT_AVAILABLE, 'kernel' );
+        $object = $node->attribute( 'object' );
 
-        $sourceNodeID = $Module->ViewParameters[0];
-        $node = \eZContentObjectTreeNode::fetch( $sourceNodeID );
-        if ( !$node instanceof \eZContentObjectTreeNode )
+        if ( $http->hasPostVariable( 'CancelButton' ) )
+            return \expChangeClassView::redirect( $Module, $node->attribute( 'url_alias' ) );
+        if ( $http->hasPostVariable( 'SelectDestinationClassButton' ) && $http->hasPostVariable( 'DestinationClassID' ) )
         {
-            \eZDebug::writeError( "Node '$sourceNodeID' not found", $this->scriptFile() );
-            return $this->viewResult( isset( $Result ) ? $Result : null,  $Module->handleError( \eZError::KERNEL_NOT_AVAILABLE, 'kernel' ) );
+            $classID = (int)$http->postVariable( 'DestinationClassID' );
+            if ( !\expChangeClassAccess::can( 'convert', $object, $classID ) )
+            {
+                \expChangeClassView::flash( 'bad', \ezpI18n::tr( 'extension/expchangeclass', 'Your role does not allow changing this object into that class (policy changeclass/convert).' ) );
+                return \expChangeClassView::redirect( $Module, 'changeclass/select_class/' . $nodeID );
+            }
+            return \expChangeClassView::redirect( $Module, 'changeclass/map_attributes/' . $nodeID . '/' . $classID );
         }
-        $sourceObjectID = $node->attribute( 'contentobject_id' );
 
-        $sourceObject = \eZContentObject::fetch( $sourceObjectID );
-        if ( !$sourceObject instanceof \eZContentObject )
+        $sourceClass = \eZContentClass::fetch( (int)$object->attribute( 'contentclass_id' ) );
+        $classes = array();
+        $allowed = 0;
+        foreach ( \expChangeClassView::classOptions( (int)$object->attribute( 'contentclass_id' ) ) as $option )
         {
-            \eZDebug::writeError( "Source object '$sourceObjectID' not found", $this->scriptFile() );
-            return $this->viewResult( isset( $Result ) ? $Result : null,  $Module->handleError( \eZError::KERNEL_NOT_AVAILABLE, 'kernel' ) );
+            $option['allowed'] = \expChangeClassAccess::can( 'convert', $object, $option['id'] );
+            if ( $option['allowed'] )
+                $allowed++;
+            $classes[] = $option;
         }
-        $sourceClassID = $sourceObject->attribute( 'contentclass_id' );
+        $facts = $sourceClass ? \expChangeClassService::facts( $object, $sourceClass, $sourceClass ) : array();
 
-
-        $tpl = \eZTemplate::factory();
-        $tpl->setVariable( 'source_class_id', $sourceClassID );
-        $tpl->setVariable( 'source_object_id', $sourceObjectID );
-        $tpl->setVariable( 'source_node_id', $sourceNodeID );
-
-        $Result = array();
-        $Result['content'] = $tpl->fetch( 'design:changeclass/select_class.tpl' );
-        $Result['path'] = array( array( 'url' => false,
-                                        'text' => 'Select destination class' ) );
-
-        return $this->viewResult( isset( $Result ) ? $Result : null, null );
+        return \expChangeClassView::page( 'select_class', array(
+            'node' => $node,
+            'object' => $object,
+            'source_class' => $sourceClass,
+            'facts' => $facts,
+            'classes' => $classes,
+            'allowed_count' => $allowed,
+            'can_convert' => \expChangeClassAccess::can( 'convert', $object ),
+            'restore_points' => \expChangeClassRestorePoint::listRecent( 5, null, (int)$object->attribute( 'id' ) ),
+        ), \expChangeClassView::path( \ezpI18n::tr( 'extension/expchangeclass', 'Choose the new class' ), $node ) );
     }
 }
 

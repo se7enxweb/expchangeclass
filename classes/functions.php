@@ -438,14 +438,36 @@ class conversionFunctions
                         continue;
                     }
 
+                    // expChangeClassKeepDropped: only the attribute row goes. Its stored data (files, image
+                    // aliases, the datatype's own rows) stays for the restore point, which puts the row back;
+                    // discarding the restore point removes that data as removeThis() did before.
                     $attributeID = $sourceObjectDataMap[$oldIdentifier]->attribute( 'id' );
                     foreach ( $objectVersions as $version )
                     {
-                        $oldAttribute = eZContentObjectAttribute::fetch( $attributeID, $version );
-                        if ( $oldAttribute instanceof eZContentObjectAttribute )
-                            $oldAttribute->removeThis( $attributeID );
+                        eZPersistentObject::removeObject( eZContentObjectAttribute::definition(),
+                                                          array( 'id' => (int) $attributeID, 'version' => (int) $version ) );
                     }
                 }
+            }
+
+            // The relation rows of relation attributes follow their attribute: those of a mapped attribute are
+            // re-pointed at the new class attribute, those of a dropped one go (the restore point keeps them).
+            // Upstream left them on the old class attribute, so the relations of a converted relation list no
+            // longer showed as the attribute's.
+            $objectIDSQL = (int) $sourceObjectID;
+            $carried = array();
+            foreach ( $mapping as $destIdentifier => $sourceIdentifier )
+            {
+                if ( $sourceIdentifier === '' || $sourceIdentifier === null || isset( $carried[$sourceIdentifier] ) )
+                    continue;
+                $carried[$sourceIdentifier] = true;
+                $db->query( 'UPDATE ezcontentobject_link SET contentclassattribute_id = ' . (int) $destClassDataMap[$destIdentifier]->attribute( 'id' ) .
+                            " WHERE from_contentobject_id = $objectIDSQL AND contentclassattribute_id = " . (int) $sourceClassDataMap[$sourceIdentifier]->attribute( 'id' ) );
+            }
+            foreach ( $sourceClassDataMap as $oldIdentifier => $oldClassAttribute )
+            {
+                if ( !isset( $carried[$oldIdentifier] ) )
+                    $db->query( "DELETE FROM ezcontentobject_link WHERE from_contentobject_id = $objectIDSQL AND contentclassattribute_id = " . (int) $oldClassAttribute->attribute( 'id' ) );
             }
 
             // Inside the transaction: if this fails the attribute moves above

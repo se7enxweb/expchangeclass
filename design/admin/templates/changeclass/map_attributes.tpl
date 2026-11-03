@@ -1,151 +1,57 @@
-{ezcss_require( array('extra.css'))}
+{* changeclass/map_attributes/<NodeID>/<ClassID>: step 2 of a class change, the mapping and the preview of what the
+   change does, in every admin design. Only shared components and tokens; no inline CSS or script. Variables: node,
+   object, plan (expChangeClassService::preview()), errors, warnings (translated), source_class, dest_class, facts,
+   command, form_uri, message. *}
+<div class="context-block a4-page">
 
-{def $source_class_attributes      = fetch( 'class', 'attribute_list', hash( 'class_id', $source_class_id ) )
-     $destination_class_attributes = fetch( 'class', 'attribute_list', hash( 'class_id', $destination_class_id ) )
-     $source_class                 = fetch( 'class', 'list', hash( 'class_filter', array( $source_class_id ) ) )
-     $destination_class            = fetch( 'class', 'list', hash( 'class_filter', array( $destination_class_id ) ) )
-     $node                         = fetch( 'content', 'node', hash( 'node_id', $source_node_id ) )
-     $simple_conversion            = fetch( 'changeclass', 'simple_conversion' )
-}
+<div class="box-header"><div class="box-ml">
+<h1 class="context-title"><span class="a4-icon a4-bi-diagram-3 is-large" aria-hidden="true"></span> {'Change %name from %class into %new_class'|i18n( 'extension/expchangeclass',, hash( '%name', $node.name, '%class', $facts.source_class.name, '%new_class', $facts.dest_class.name ) )|wash}</h1>
+</div></div>
 
-<form action={"changeclass/action"|ezurl} method="post" >
-<input type="hidden" name="NodeID" value="{$source_node_id}" />
-<div class="context-block">
+<div class="box-bc"><div class="box-ml"><div class="box-content">
 
-<div class="box-header"><div class="box-tc"><div class="box-ml"><div class="box-mr"><div class="box-tl"><div class="box-tr">
+{include uri='design:changeclass/parts/steps.tpl' step=2}
 
-<h1 class="context-title">{'Change object content class &lt;%name&gt; [%class_name]'|i18n( 'design/admin/changeclass/map_attributes',, hash( '%name', $node.name|wash(), '%class_name', $node.class_name ) )}</h1>
+<p class="a4-intro">{'Nothing is written until you apply the change. Then a restore point of every version and language is taken first, the change runs in one transaction that is rolled back as a whole on any error, and the object\'s caches and search index entry are renewed.'|i18n( 'extension/expchangeclass' )}</p>
 
-<div class="header-mainline"></div>
-</div></div></div></div></div></div>
+{include uri='design:changeclass/parts/message.tpl' message=$message}
+{include uri='design:changeclass/parts/problems.tpl' errors=$errors warnings=$warnings}
 
-<div class="box-ml"><div class="box-mr"><div class="box-content">
+<form method="post" action={$form_uri|ezurl} class="a4-stack">
+<input type="hidden" name="PlanToken" value="{$plan.token|wash}" />
 
-<div class="context-attributes">
+<ul class="a4-figures" aria-label="{'What the change touches'|i18n( 'extension/expchangeclass' )|wash}">
+    <li class="a4-figure"><strong>{$plan.stats.versions}</strong><span>{'versions'|i18n( 'extension/expchangeclass' )}</span></li>
+    <li class="a4-figure"><strong>{$plan.stats.languages}</strong><span>{'languages'|i18n( 'extension/expchangeclass' )}</span></li>
+    <li class="a4-figure"><strong>{$plan.stats.carried}</strong><span>{'attributes carried over'|i18n( 'extension/expchangeclass' )}</span></li>
+    <li class="a4-figure"><strong>{$plan.stats.dropped}</strong><span>{'old attributes dropped'|i18n( 'extension/expchangeclass' )}</span></li>
+    <li class="a4-figure"><strong>{$plan.stats.drafts}</strong><span>{'drafts'|i18n( 'extension/expchangeclass' )}</span></li>
+</ul>
 
-    {if $warnings}
-    <div>{'Warnings:'|i18n( 'design/admin/changeclass/map_attributes' )}
-        <ul>
-        {if is_set($warnings.unsupported_datatypes)}
-            <li class="message-error">{'Destination class has at least one unsupported datatype. You can\'t use this class.'|i18n( 'design/admin/changeclass/map_attributes' )}</li>
-        {/if}
-        {if is_set($warnings.no_children)}
-            <li>{'Destination class is not configured to be container!'|i18n( 'design/admin/changeclass/map_attributes' )}</li>
-        {/if}
-        {if is_set($warnings.lost_attributes)}
-            <li>{'The following attributes can not be mapped:'|i18n( 'design/admin/changeclass/map_attributes' )}
-                <ul>
-                {foreach $warnings.lost_attributes as $attr}
-                    <li>{$attr.name} ({$attr.datatype})</li>
-                {/foreach}
-                </ul
-            </li>
-        {/if}
-        </ul>
+<div id="exp-cc-preview">
+{include uri='design:changeclass/parts/mapping_table.tpl' plan=$plan show_values=true()}
+</div>
+
+<details class="a4-fold">
+    <summary>{'The same from a shell'|i18n( 'extension/expchangeclass' )}</summary>
+    <div class="a4-fold-body">
+        <p class="a4-meta">{'Without --apply the command only shows this preview. Add --apply to change the class; --format=json prints the plan for scripts.'|i18n( 'extension/expchangeclass' )}</p>
+        <pre class="a4-pre">{$command|wash}</pre>
     </div>
-    {else}
-    <div>{'No warnigs for this operation'|i18n( 'design/admin/changeclass/map_attributes' )}</div>
-    {/if}
+</details>
 
-
-
-</div>
-
-</div></div></div>
-
-<div class="controlbar">
-<div class="box-bc"><div class="box-ml"><div class="box-mr">
-
-<div class="box-tc"><div class="box-bl"><div class="box-br">
-<div class="block">
-    <input class="button" type="submit" name="SelectSourceObjectButton" value="{'Back to destination class selection'|i18n( 'design/admin/changeclass/map_attributes' )}" />
-</div>
-</div></div></div>
-
-</div></div></div>
-</div>
-
-
-{if is_unset($warnings.unsupported_datatypes)}
-
-<div class="context-block">
-
-<input type="hidden" name="SourceObjectID" value="{$source_object_id}" />
-<input type="hidden" name="SourceClassID" value="{$source_class_id}" />
-<input type="hidden" name="SourceNodeID" value="{$source_node_id}" />
-<input type="hidden" name="DestinationClassID" value="{$destination_class_id}" />
-
-
-<div class="box-header"><div class="box-tc"><div class="box-ml"><div class="box-mr"><div class="box-tl"><div class="box-tr">
-
-<h2 class="context-title">{'Attributes mapping'|i18n( 'design/admin/changeclass/map_attributes' )}</h2>
-
-<div class="header-subline"></div>
-
-</div></div></div></div></div></div>
-
-<div class="box-ml"><div class="box-mr"><div class="box-content">
-<div class="context-attributes">
-
-<table class="list" cellspacing="0">
-  <tr>
-    <th>{'Source class (%source_class)'|i18n( 'design/admin/changeclass/map_attributes',, hash( '%source_class', $source_class.0.name ) )}</th>
-    <th>{'Destination class (%destination_class)'|i18n( 'design/admin/changeclass/map_attributes',, hash( '%destination_class', $destination_class.0.name ) )}</th>
-  </tr>
-{def $iter=0}
-{foreach $destination_class_attributes as $dest_attribute sequence array( 'bglight', 'bgdark' ) as $style}
-  <tr class="{$style}">
-    <td>
-    <select name="SourceAttribute[{$dest_attribute.identifier}]">
-        <option value="">{'(leave empty)'|i18n( 'design/admin/changeclass/map_attributes' )}</option>
-    {set $iter=0}
-    {foreach $source_class_attributes as $source_attribute}
-        {if or( eq( $source_attribute.data_type_string, $dest_attribute.data_type_string ),
-                and( is_set($additional_attribute_map[ $source_attribute.data_type_string ]), $additional_attribute_map[ $source_attribute.data_type_string ]|contains( $dest_attribute.data_type_string ) ),
-                and(is_set( $simple_conversion[ $source_attribute.data_type_string ] ), $simple_conversion[ $source_attribute.data_type_string ]|contains( $dest_attribute.data_type_string ))
-             )}
-        {* Pre-select the source attribute whose identifier matches the destination,
-   falling back to the first. Defaulting every row to the first attribute made
-   it easy to publish a mapping that silently moved the wrong content. *}
-        <option value="{$source_attribute.identifier}"{if or( eq( $source_attribute.identifier, $dest_attribute.identifier ), eq( $iter, 0 ) )} selected="selected"{/if}>{$source_attribute.name} ({$source_attribute.data_type_string})</option>
-          {set $iter=inc( $iter )}
-        {/if}
-    {/foreach}
-    </td>
-    <td>{$dest_attribute.name} ({$dest_attribute.data_type_string})</td>
-  </tr>
-{/foreach}
-
-</table>
-
-    <div class="block">
-        <label>{'Options:'|i18n( 'design/admin/changeclass/map_attributes' )}</label>
-
-
-    <div><input type="checkbox" name="KeepOwnerAndDate" checked="checked" />{'Keep original object creator and creation date'|i18n( 'design/admin/changeclass/map_attributes' )}</div>
-    {if gt( $node.children_count, 0 )}
-    <div><input type="checkbox" name="CopyChildren" {if is_set($warnings.no_children)}disabled="disabled"{else}checked="checked"{/if} />{'Add source object\'s children to new object'|i18n( 'design/admin/changeclass/map_attributes' )}</div>
-    {/if}
-    <div><input type="checkbox" name="GenerateConsoleParameters" />{'Generate parameters for converting all instancees of this class'|i18n( 'design/admin/changeclass/map_attributes' )}</div>
+<div class="a4-toolbar is-sticky">
+    <p class="a4-meta">{if $plan.ok}{'Changed a select? Update the preview first: the change applies exactly what the preview shows.'|i18n( 'extension/expchangeclass' )}{else}{'Fix what is listed at the top before the class can be changed.'|i18n( 'extension/expchangeclass' )}{/if}</p>
+    <div class="a4-actions">
+        <button class="a4-btn" type="submit" name="BackButton" value="1">{'Back'|i18n( 'extension/expchangeclass' )}</button>
+        <button class="a4-btn" type="submit" name="CancelButton" value="1">{'Cancel'|i18n( 'extension/expchangeclass' )}</button>
+        <button class="a4-btn" type="submit" name="PreviewButton" value="1">{'Update the preview'|i18n( 'extension/expchangeclass' )}</button>
+        <button class="a4-btn a4-btn-primary" type="submit" name="ApplyButton" value="1"{if $plan.ok|not} disabled="disabled"{/if}>{'Change the class'|i18n( 'extension/expchangeclass' )}</button>
     </div>
-
 </div>
 
-</div></div></div>
-
-<div class="controlbar">
-<div class="box-bc"><div class="box-ml"><div class="box-mr"><div class="box-tc"><div class="box-bl"><div class="box-br">
-<div class="block">
-
-    <div class="button-right">
-        <input class="button button-important" type="submit" name="ModifyObjectContentClassButton" value="{'Modify Object'|i18n( 'design/admin/changeclass/map_attributes' )}" />
-       {* <input class="button" type="submit" name="ChangeObjectContentClassButton" value="Copy Object" />*}
-    </div>
-    <div class="break"></div>
-</div>
-</div></div></div></div></div></div>
-</div>
-</div>
-
-{/if}
 </form>
+
+</div></div></div>
+
+</div>

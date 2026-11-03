@@ -39,6 +39,7 @@ include_once( 'autoload.php' );
 // with "Class conversionFunctions not found". __DIR__ keeps it correct whatever
 // the working directory is.
 require_once( __DIR__ . '/../classes/functions.php' );
+// exp:changeclass does the same with a preview (dry run unless --apply); this script is kept for its parameter files.
 $cli = eZCLI::instance();
 
 $script = eZScript::instance( array( 'description' => ( "\nThis script performs batch conversion of objects of a specific class!\n" .
@@ -60,6 +61,15 @@ $options = $script->getOptions( "[db-host:][db-user:][db-password:][db-database:
                                        'sub-tree' => "Restrict by Subtree Node Id"
                                        ) );
 $script->initialize();
+
+// The change checks the policies of the user it runs as (changeclass/convert, content/edit), as in the
+// administration: without --login the script acts as the administrator account "admin".
+if ( !eZUser::currentUser()->isRegistered() )
+{
+    $runAs = eZUser::fetchByName( 'admin' );
+    if ( $runAs instanceof eZUser )
+        eZUser::setCurrentlyLoggedInUser( $runAs, (int) $runAs->attribute( 'contentobject_id' ), eZUser::NO_SESSION_REGENERATE );
+}
 
 $dbUser = $options['db-user'];
 $dbPassword = $options['db-password'];
@@ -221,8 +231,12 @@ do
 
     foreach ( $nodeArray as $node )
     {
-        $conversionError = null;
-        $temp = conversionFunctions::convertObject( $node->attribute('contentobject_id'), $class_array[1], $mapping, $conversionError );
+        // the same plan, restore point and transaction as the administration and exp:changeclass
+        $applied = expChangeClassService::apply( (int) $node->attribute('contentobject_id'), $class_array[1], $mapping, array( 'via' => 'command' ) );
+        $temp = $applied['ok'];
+        $conversionError = $applied['ok'] ? null : $applied['error'];
+        if ( $applied['ok'] && !$isQuiet )
+            $cli->notice( 'restore point ' . $applied['restore_point'] );
 
         if ( !$temp )
         {

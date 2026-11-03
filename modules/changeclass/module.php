@@ -23,22 +23,70 @@
 
 $Module = array( 'name' => 'changeclass' );
 
-// Converting an object rewrites its attributes across every version and
-// language, so the views are gated on a policy rather than on module access
-// alone. Upstream declared no functions at all, which left the only possible
-// grant an all-or-nothing one on the module.
+// The policies and their limitations (classes/expchangeclassaccess.php). Converting an object rewrites its
+// attributes across every version and language, so every view is gated on a policy rather than on module access
+// alone, and a change also needs content/edit on the object.
+$ClassLimitation = array(
+    'name' => 'Class',
+    'values' => array(),
+    'class' => 'eZContentClass',
+    'function' => 'fetchList',
+    'parameter' => array( 0, false, false, array( 'name' => 'asc' ) ) );
+$NewClassLimitation = array(
+    'name' => 'NewClass',
+    'values' => array(),
+    'class' => 'eZContentClass',
+    'function' => 'fetchList',
+    'parameter' => array( 0, false, false, array( 'name' => 'asc' ) ) );
+$SectionLimitation = array(
+    'name' => 'Section',
+    'values' => array(),
+    'class' => 'eZSection',
+    'function' => 'fetchList',
+    'parameter' => array( false ) );
+$NodeLimitation = array( 'name' => 'Node', 'values' => array() );
+$SubtreeLimitation = array( 'name' => 'Subtree', 'values' => array() );
+
 $FunctionList = array();
-$FunctionList['convert'] = array();
+// one object: Class is its class now, NewClass the class it becomes
+$FunctionList['convert'] = array( 'Class' => $ClassLimitation, 'NewClass' => $NewClassLimitation, 'Section' => $SectionLimitation,
+                                  'Node' => $NodeLimitation, 'Subtree' => $SubtreeLimitation );
+// undoing a change from its restore point (NewClass: the class the object gets back)
+$FunctionList['restore'] = array( 'Class' => $ClassLimitation, 'NewClass' => $NewClassLimitation, 'Section' => $SectionLimitation,
+                                  'Node' => $NodeLimitation, 'Subtree' => $SubtreeLimitation );
+// every object of a class in a subtree, as a background job (each object is still checked against convert)
+$FunctionList['bulk'] = array( 'Class' => $ClassLimitation, 'NewClass' => $NewClassLimitation );
+// every user's changes, discarding restore points, the editor policies button
+$FunctionList['administrate'] = array();
 
 $ViewList = array();
 $ViewList['select_class'] = array(
     'script' => 'select_class.php',
     'functions' => array( 'convert' ),
-    'params' => array (  ) );
+    'default_navigation_part' => 'ezcontentnavigationpart',
+    'params' => array( 'NodeID' ) );
 $ViewList['map_attributes'] = array(
     'script' => 'map_attributes.php',
     'functions' => array( 'convert' ),
-    'params' => array (  ) );
+    'default_navigation_part' => 'ezcontentnavigationpart',
+    'params' => array( 'NodeID', 'ClassID' ) );
+$ViewList['result'] = array(
+    'script' => 'result.php',
+    'functions' => array( 'convert' ),
+    'default_navigation_part' => 'ezcontentnavigationpart',
+    'params' => array( 'RestorePointID' ) );
+$ViewList['dashboard'] = array(
+    'script' => 'dashboard.php',
+    'functions' => array( 'convert' ),
+    'default_navigation_part' => 'ezsetupnavigationpart',
+    'params' => array(),
+    'unordered_params' => array( 'user' => 'User', 'state' => 'State' ) );
+$ViewList['bulk'] = array(
+    'script' => 'bulk.php',
+    'functions' => array( 'bulk' ),
+    'default_navigation_part' => 'ezsetupnavigationpart',
+    'params' => array( 'ClassID', 'NewClassID', 'NodeID' ) );
+// the entry of the context menus (a POST with NodeID), and the old single page of the extension
 $ViewList['action'] = array(
     'script' => 'action.php',
     'functions' => array( 'convert' ),
