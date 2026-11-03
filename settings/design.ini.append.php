@@ -3,8 +3,7 @@
 [ExtensionSettings]
 DesignExtensions[]=expchangeclass
 
-[StylesheetSettings]
-# the admin styles of the extension (no inline CSS in its templates), bundled by the ezjscore packer
-BackendCSSFileList[]=expchangeclass_admin.css
+# The pages of the extension use only the shared admin components (components.css) and the --a4-* tokens of each
+# admin design, so the extension ships no stylesheet of its own.
 
 */ ?>
