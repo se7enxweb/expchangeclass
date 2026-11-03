@@ -303,25 +303,24 @@ class conversionFunctions
         {
             // the (version, language) pairs the object has rows for, and the source row of each pair and attribute
             $pairs = array();
-            $sourceRows = array();
+            $originals = array();
             foreach ( $rows as $row )
             {
                 $pair = (int) $row['version'] . '/' . $row['language_code'];
                 $pairs[$pair] = array( (int) $row['version'], (string) $row['language_code'] );
                 $classAttributeID = (int) $row['contentclassattribute_id'];
                 $identifier = isset( $identifierOfClassAttribute[$classAttributeID] ) ? $identifierOfClassAttribute[$classAttributeID] : null;
-                if ( $identifier !== null )
-                    $sourceRows[$identifier][$pair] = $row;
-
                 $attribute = eZContentObjectAttribute::fetch( (int) $row['id'], (int) $row['version'] );
                 if ( !$attribute instanceof eZContentObjectAttribute )
                     continue;
+                // the row as it was stored: the converters and the copies read the source datatype and data from it
+                if ( $identifier !== null )
+                    $originals[$identifier][$pair] = clone $attribute;
                 if ( $identifier !== null && isset( $carries[$identifier] ) )
                 {
                     $destClassAttribute = $destClassDataMap[$carries[$identifier]];
-                    $sourceClassAttribute = $sourceClassDataMap[$identifier];
                     $attribute->setAttribute( 'contentclassattribute_id', (int) $destClassAttribute->attribute( 'id' ) );
-                    self::customConverter( $attribute, $sourceClassAttribute, $destClassAttribute );
+                    self::customConverter( $attribute, $originals[$identifier][$pair], $destClassAttribute );
                     $attribute->store();
                 }
                 else
@@ -336,7 +335,6 @@ class conversionFunctions
             foreach ( $copies as $destIdentifier => $sourceIdentifier )
             {
                 $destClassAttribute = $destClassDataMap[$destIdentifier];
-                $sourceClassAttribute = $sourceClassDataMap[$sourceIdentifier];
                 $idOfLanguage = array();
                 foreach ( $pairs as $pair => $versionLanguage )
                 {
@@ -344,16 +342,13 @@ class conversionFunctions
                     // one id per language across the versions, as the kernel keeps it
                     if ( isset( $idOfLanguage[$versionLanguage[1]] ) )
                         $copy->setAttribute( 'id', $idOfLanguage[$versionLanguage[1]] );
-                    if ( isset( $sourceRows[$sourceIdentifier][$pair] ) )
+                    if ( isset( $originals[$sourceIdentifier][$pair] ) )
                     {
-                        $original = eZContentObjectAttribute::fetch( (int) $sourceRows[$sourceIdentifier][$pair]['id'], $versionLanguage[0] );
-                        if ( $original instanceof eZContentObjectAttribute )
-                        {
-                            foreach ( array( 'data_text', 'data_int', 'data_float', 'sort_key_int', 'sort_key_string' ) as $field )
-                                $copy->setAttribute( $field, $original->attribute( $field ) );
-                            $copy->setContent( $original->content() );
-                            self::customConverter( $copy, $sourceClassAttribute, $destClassAttribute );
-                        }
+                        $original = $originals[$sourceIdentifier][$pair];
+                        foreach ( array( 'data_text', 'data_int', 'data_float', 'sort_key_int', 'sort_key_string' ) as $field )
+                            $copy->setAttribute( $field, $original->attribute( $field ) );
+                        $copy->setContent( $original->content() );
+                        self::customConverter( $copy, $original, $destClassAttribute );
                     }
                     $copy->store();
                     $idOfLanguage[$versionLanguage[1]] = (int) $copy->attribute( 'id' );
