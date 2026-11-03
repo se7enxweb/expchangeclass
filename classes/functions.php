@@ -185,19 +185,28 @@ class conversionFunctions
     /**
      * Convert one object to another content class.
      *
-     * Everything that touches content runs inside a single transaction and is
-     * rolled back as a unit. The predecessors opened a transaction, mutated
-     * attributes across every version and language, and then either committed
-     * or died part way through with no rollback - and changed the object's
-     * contentclass_id after the commit, so a failure there left attributes
-     * belonging to the new class on an object still claiming the old one.
+     * Works on the object's attribute rows as they are stored, every version and every language a row exists for:
+     * the predecessors walked the languages of the siteaccess (eZContentObject::languages() keeps only the
+     * prioritized ones) and the data map of the current version, so a translation in a language the siteaccess does
+     * not list, or a language only an older version has, kept attributes of the old class on an object of the new.
      *
-     * Returns true on success. On failure the content is unchanged and the
-     * reason is in $errorMessage.
+     *  - a carried attribute row (the first destination that names its source) is re-pointed at the new class
+     *    attribute, converted when the datatypes differ, and stored;
+     *  - a source named by more than one destination is copied into the further ones, from the row of the same
+     *    version and language (data, sort keys and content);
+     *  - a destination with no source gets an initialized empty row per version and language;
+     *  - a source row nothing carries is removed as a row only: its stored data (files, image aliases, the
+     *    datatype's own tables) stays for the restore point (expChangeClassRestorePoint), which puts the row back,
+     *    and goes when the restore point is discarded;
+     *  - the relation rows of relation attributes follow their attribute, those of a dropped one go.
+     *
+     * Everything, the object's contentclass_id included, runs in one transaction and is rolled back as a unit on any
+     * error. Returns true on success; on failure the content is unchanged and the reason is in $errorMessage.
      */
     static function convertObject( $sourceObjectID, $destinationClassID, $mapping, &$errorMessage = null )
     {
         $errorMessage = null;
+        $sourceObjectID = (int) $sourceObjectID;
 
         $sourceObject = eZContentObject::fetch( $sourceObjectID );
         if ( !$sourceObject instanceof eZContentObject )
@@ -206,27 +215,14 @@ class conversionFunctions
             return false;
         }
 
-        // Resolve the destination class before dereferencing it. Upstream read
-        // $destClass->attribute( 'id' ) immediately after fetchByIdentifier()
-        // and only tested for null afterwards, so an unknown identifier was a
-        // fatal rather than an error message.
-        if ( is_numeric( $destinationClassID ) )
-        {
-            $destClass = eZContentClass::fetch( (int) $destinationClassID );
-        }
-        else
-        {
-            $destClass = eZContentClass::fetchByIdentifier( $destinationClassID );
-        }
-
+        $destClass = is_numeric( $destinationClassID ) ? eZContentClass::fetch( (int) $destinationClassID )
+                                                       : eZContentClass::fetchByIdentifier( $destinationClassID );
         if ( !$destClass instanceof eZContentClass )
         {
             $errorMessage = "Destination class '$destinationClassID' not found.";
             return false;
         }
-
         $destinationClassID = (int) $destClass->attribute( 'id' );
-
         $destClassDataMap = $destClass->dataMap();
         if ( !$destClassDataMap )
         {
@@ -234,65 +230,57 @@ class conversionFunctions
             return false;
         }
 
-        $sourceClass = eZContentClass::fetchByIdentifier( $sourceObject->attribute( 'class_identifier' ) );
+        $sourceClass = eZContentClass::fetch( (int) $sourceObject->attribute( 'contentclass_id' ) );
         if ( !$sourceClass instanceof eZContentClass )
         {
-            $errorMessage = "Source class '" . $sourceObject->attribute( 'class_identifier' ) . "' not found.";
+            $errorMessage = "Source class " . $sourceObject->attribute( 'contentclass_id' ) . " not found.";
             return false;
         }
-
         $sourceClassDataMap = $sourceClass->dataMap();
         if ( !is_array( $sourceClassDataMap ) )
             $sourceClassDataMap = array();
-
         if ( (int) $sourceClass->attribute( 'id' ) === $destinationClassID )
         {
             $errorMessage = 'Source and destination class are the same; nothing to convert.';
             return false;
         }
 
-        // Validate the whole mapping before writing anything. A mapping that
-        // names an attribute neither class has used to surface as a fatal in
-        // the middle of the rewrite, with earlier attributes already stored.
+        // The whole mapping is validated before anything is written.
         $mapping = is_array( $mapping ) ? $mapping : array();
         foreach ( $mapping as $destIdentifier => $sourceIdentifier )
         {
-            if ( !isset( $destClassDataMap[$destIdentifier] ) ||
-                 !$destClassDataMap[$destIdentifier] instanceof eZContentClassAttribute )
+            if ( !isset( $destClassDataMap[$destIdentifier] ) || !$destClassDataMap[$destIdentifier] instanceof eZContentClassAttribute )
             {
                 $errorMessage = "Destination class has no attribute '$destIdentifier'.";
                 return false;
             }
-
-            if ( $sourceIdentifier !== '' && $sourceIdentifier !== null &&
-                 !isset( $sourceClassDataMap[$sourceIdentifier] ) )
+            if ( $sourceIdentifier !== '' && $sourceIdentifier !== null && !isset( $sourceClassDataMap[$sourceIdentifier] ) )
             {
                 $errorMessage = "Source class has no attribute '$sourceIdentifier'.";
                 return false;
             }
         }
+        // a destination the mapping does not name stays empty
+        foreach ( $destClassDataMap as $destIdentifier => $destClassAttribute )
+            if ( !array_key_exists( $destIdentifier, $mapping ) )
+                $mapping[$destIdentifier] = '';
 
-        $versions = $sourceObject->attribute( 'versions' );
-        $objectVersions = array();
-        if ( is_array( $versions ) )
+        // which destination carries a source (the first one naming it), which ones copy it, which stay empty
+        $carries = array();
+        $copies = array();
+        $empty = array();
+        foreach ( $mapping as $destIdentifier => $sourceIdentifier )
         {
-            foreach ( $versions as $version )
-                $objectVersions[] = $version->attribute( 'version' );
+            if ( $sourceIdentifier === '' || $sourceIdentifier === null )
+                $empty[] = $destIdentifier;
+            else if ( !isset( $carries[$sourceIdentifier] ) )
+                $carries[$sourceIdentifier] = $destIdentifier;
+            else
+                $copies[$destIdentifier] = $sourceIdentifier;
         }
-
-        $languages = $sourceObject->languages();
-        $languageArray = array();
-        if ( is_array( $languages ) )
-        {
-            foreach ( $languages as $locale => $language )
-                $languageArray[] = $locale;
-        }
-
-        if ( !$objectVersions || !$languageArray )
-        {
-            $errorMessage = "Object $sourceObjectID has no versions or no languages to convert.";
-            return false;
-        }
+        $identifierOfClassAttribute = array();
+        foreach ( $sourceClassDataMap as $identifier => $classAttribute )
+            $identifierOfClassAttribute[(int) $classAttribute->attribute( 'id' )] = $identifier;
 
         global $sourceClassName, $destClassName, $sourceClassIdentifier, $destClassIdentifier, $sourceObjectCount;
         $sourceClassName       = $sourceObject->className();
@@ -302,192 +290,120 @@ class conversionFunctions
         $sourceObjectCount     = $sourceClass->objectCount() - 1;
 
         $db = eZDB::instance();
-        $db->begin();
+        $rows = $db->arrayQuery( "SELECT id, version, language_code, contentclassattribute_id FROM ezcontentobject_attribute
+                                  WHERE contentobject_id = $sourceObjectID ORDER BY version, language_code, id" );
+        if ( !$rows )
+        {
+            $errorMessage = "Object $sourceObjectID has no attributes to convert.";
+            return false;
+        }
 
+        $db->begin();
         try
         {
-            foreach ( $languageArray as $languageCode )
+            // the (version, language) pairs the object has rows for, and the source row of each pair and attribute
+            $pairs = array();
+            $sourceRows = array();
+            foreach ( $rows as $row )
             {
-                $usedAttributes = array();
-                $missingAttributes = array();
-                $duplicatedAttributes = array();
-                $sourceObjectDataMap = $sourceObject->fetchDataMap( false, $languageCode );
-                if ( !is_array( $sourceObjectDataMap ) )
-                    $sourceObjectDataMap = array();
+                $pair = (int) $row['version'] . '/' . $row['language_code'];
+                $pairs[$pair] = array( (int) $row['version'], (string) $row['language_code'] );
+                $classAttributeID = (int) $row['contentclassattribute_id'];
+                $identifier = isset( $identifierOfClassAttribute[$classAttributeID] ) ? $identifierOfClassAttribute[$classAttributeID] : null;
+                if ( $identifier !== null )
+                    $sourceRows[$identifier][$pair] = $row;
 
-                foreach ( $mapping as $destIdentifier => $sourceIdentifier )
-                {
-                    if ( $sourceIdentifier === '' || $sourceIdentifier === null )
-                    {
-                        $missingAttributes[] = $destIdentifier;
-                        continue;
-                    }
-
-                    // One source attribute may feed several destination ones;
-                    // the extra copies are created further down.
-                    if ( in_array( $sourceIdentifier, $usedAttributes, true ) )
-                    {
-                        $duplicatedAttributes[$destIdentifier] = $sourceIdentifier;
-                        continue;
-                    }
-
-                    $usedAttributes[] = $sourceIdentifier;
-
-                    // The source object may simply not carry this attribute in
-                    // this language; that is not an error.
-                    if ( !isset( $sourceObjectDataMap[$sourceIdentifier] ) ||
-                         !$sourceObjectDataMap[$sourceIdentifier] instanceof eZContentObjectAttribute )
-                    {
-                        continue;
-                    }
-
-                    foreach ( $objectVersions as $version )
-                    {
-                        $sourceObjectAttr = eZContentObjectAttribute::fetch(
-                            $sourceObjectDataMap[$sourceIdentifier]->attribute( 'id' ),
-                            $version );
-
-                        if ( !$sourceObjectAttr instanceof eZContentObjectAttribute )
-                            continue;
-
-                        $sourceObjectAttr->setAttribute(
-                            'contentclassattribute_id',
-                            $destClassDataMap[$destIdentifier]->attribute( 'id' ) );
-
-                        self::customConverter(
-                            $sourceObjectAttr,
-                            $sourceObjectDataMap[$sourceIdentifier],
-                            $destClassDataMap[$destIdentifier] );
-
-                        $sourceObjectAttr->store();
-                    }
-                }
-
-                // Source attributes mapped onto more than one destination.
-                foreach ( $duplicatedAttributes as $destIdentifier => $sourceIdentifier )
-                {
-                    if ( !isset( $sourceObjectDataMap[$sourceIdentifier] ) ||
-                         !$sourceObjectDataMap[$sourceIdentifier] instanceof eZContentObjectAttribute )
-                    {
-                        continue;
-                    }
-
-                    $attributeID = $destClassDataMap[$destIdentifier]->attribute( 'id' );
-                    $newAttribute = false;
-
-                    foreach ( $objectVersions as $index => $version )
-                    {
-                        if ( $index === 0 || !$newAttribute instanceof eZContentObjectAttribute )
-                        {
-                            $newAttribute = eZContentObjectAttribute::create(
-                                $attributeID, $sourceObjectID, $version, $languageCode );
-                            $newAttribute->setContent( $sourceObjectDataMap[$sourceIdentifier]->content() );
-                            self::customConverter( $newAttribute,
-                                                   $sourceObjectDataMap[$sourceIdentifier],
-                                                   $destClassDataMap[$destIdentifier] );
-                            $newAttribute->store();
-                        }
-                        else
-                        {
-                            $clonedAttribute = $newAttribute->cloneContentObjectAttribute(
-                                $version, $objectVersions[0], $sourceObjectID );
-                            if ( !$clonedAttribute instanceof eZContentObjectAttribute )
-                                continue;
-                            $clonedAttribute->setContent( $sourceObjectDataMap[$sourceIdentifier]->content() );
-                            self::customConverter( $clonedAttribute,
-                                                   $sourceObjectDataMap[$sourceIdentifier],
-                                                   $destClassDataMap[$destIdentifier] );
-                            $clonedAttribute->sync();
-                        }
-                    }
-                }
-
-                // Destination attributes with no source: create them empty.
-                foreach ( $missingAttributes as $destIdentifier )
-                {
-                    $attributeID = $destClassDataMap[$destIdentifier]->attribute( 'id' );
-                    $newAttribute = false;
-
-                    foreach ( $objectVersions as $index => $version )
-                    {
-                        if ( $index === 0 || !$newAttribute instanceof eZContentObjectAttribute )
-                        {
-                            $newAttribute = eZContentObjectAttribute::create(
-                                $attributeID, $sourceObjectID, $version, $languageCode );
-                            $newAttribute->store();
-                        }
-                        else
-                        {
-                            $clonedAttribute = $newAttribute->cloneContentObjectAttribute(
-                                $version, $objectVersions[0], $sourceObjectID );
-                            if ( $clonedAttribute instanceof eZContentObjectAttribute )
-                                $clonedAttribute->sync();
-                        }
-                    }
-                }
-
-                // Source attributes the mapping did not carry over.
-                foreach ( array_keys( $sourceClassDataMap ) as $oldIdentifier )
-                {
-                    if ( in_array( $oldIdentifier, $usedAttributes, true ) )
-                        continue;
-
-                    if ( !isset( $sourceObjectDataMap[$oldIdentifier] ) ||
-                         !$sourceObjectDataMap[$oldIdentifier] instanceof eZContentObjectAttribute )
-                    {
-                        continue;
-                    }
-
-                    // expChangeClassKeepDropped: only the attribute row goes. Its stored data (files, image
-                    // aliases, the datatype's own rows) stays for the restore point, which puts the row back;
-                    // discarding the restore point removes that data as removeThis() did before.
-                    $attributeID = $sourceObjectDataMap[$oldIdentifier]->attribute( 'id' );
-                    foreach ( $objectVersions as $version )
-                    {
-                        eZPersistentObject::removeObject( eZContentObjectAttribute::definition(),
-                                                          array( 'id' => (int) $attributeID, 'version' => (int) $version ) );
-                    }
-                }
-            }
-
-            // The relation rows of relation attributes follow their attribute: those of a mapped attribute are
-            // re-pointed at the new class attribute, those of a dropped one go (the restore point keeps them).
-            // Upstream left them on the old class attribute, so the relations of a converted relation list no
-            // longer showed as the attribute's.
-            $objectIDSQL = (int) $sourceObjectID;
-            $carried = array();
-            foreach ( $mapping as $destIdentifier => $sourceIdentifier )
-            {
-                if ( $sourceIdentifier === '' || $sourceIdentifier === null || isset( $carried[$sourceIdentifier] ) )
+                $attribute = eZContentObjectAttribute::fetch( (int) $row['id'], (int) $row['version'] );
+                if ( !$attribute instanceof eZContentObjectAttribute )
                     continue;
-                $carried[$sourceIdentifier] = true;
-                $db->query( 'UPDATE ezcontentobject_link SET contentclassattribute_id = ' . (int) $destClassDataMap[$destIdentifier]->attribute( 'id' ) .
-                            " WHERE from_contentobject_id = $objectIDSQL AND contentclassattribute_id = " . (int) $sourceClassDataMap[$sourceIdentifier]->attribute( 'id' ) );
-            }
-            foreach ( $sourceClassDataMap as $oldIdentifier => $oldClassAttribute )
-            {
-                if ( !isset( $carried[$oldIdentifier] ) )
-                    $db->query( "DELETE FROM ezcontentobject_link WHERE from_contentobject_id = $objectIDSQL AND contentclassattribute_id = " . (int) $oldClassAttribute->attribute( 'id' ) );
+                if ( $identifier !== null && isset( $carries[$identifier] ) )
+                {
+                    $destClassAttribute = $destClassDataMap[$carries[$identifier]];
+                    $sourceClassAttribute = $sourceClassDataMap[$identifier];
+                    $attribute->setAttribute( 'contentclassattribute_id', (int) $destClassAttribute->attribute( 'id' ) );
+                    self::customConverter( $attribute, $sourceClassAttribute, $destClassAttribute );
+                    $attribute->store();
+                }
+                else
+                {
+                    // expChangeClassKeepDropped: only the row goes; its stored data stays for the restore point
+                    eZPersistentObject::removeObject( eZContentObjectAttribute::definition(),
+                                                      array( 'id' => (int) $row['id'], 'version' => (int) $row['version'] ) );
+                }
             }
 
-            // Inside the transaction: if this fails the attribute moves above
-            // are rolled back with it, instead of leaving attributes of the new
-            // class on an object still declaring the old one.
+            // further destinations of one source: a copy of the same version's and language's row
+            foreach ( $copies as $destIdentifier => $sourceIdentifier )
+            {
+                $destClassAttribute = $destClassDataMap[$destIdentifier];
+                $sourceClassAttribute = $sourceClassDataMap[$sourceIdentifier];
+                $idOfLanguage = array();
+                foreach ( $pairs as $pair => $versionLanguage )
+                {
+                    $copy = eZContentObjectAttribute::create( (int) $destClassAttribute->attribute( 'id' ), $sourceObjectID, $versionLanguage[0], $versionLanguage[1] );
+                    // one id per language across the versions, as the kernel keeps it
+                    if ( isset( $idOfLanguage[$versionLanguage[1]] ) )
+                        $copy->setAttribute( 'id', $idOfLanguage[$versionLanguage[1]] );
+                    if ( isset( $sourceRows[$sourceIdentifier][$pair] ) )
+                    {
+                        $original = eZContentObjectAttribute::fetch( (int) $sourceRows[$sourceIdentifier][$pair]['id'], $versionLanguage[0] );
+                        if ( $original instanceof eZContentObjectAttribute )
+                        {
+                            foreach ( array( 'data_text', 'data_int', 'data_float', 'sort_key_int', 'sort_key_string' ) as $field )
+                                $copy->setAttribute( $field, $original->attribute( $field ) );
+                            $copy->setContent( $original->content() );
+                            self::customConverter( $copy, $sourceClassAttribute, $destClassAttribute );
+                        }
+                    }
+                    $copy->store();
+                    $idOfLanguage[$versionLanguage[1]] = (int) $copy->attribute( 'id' );
+                }
+            }
+
+            // destinations with no source: an initialized row per version and language
+            foreach ( $empty as $destIdentifier )
+            {
+                $destClassAttribute = $destClassDataMap[$destIdentifier];
+                $idOfLanguage = array();
+                foreach ( $pairs as $versionLanguage )
+                {
+                    $newAttribute = eZContentObjectAttribute::create( (int) $destClassAttribute->attribute( 'id' ), $sourceObjectID, $versionLanguage[0], $versionLanguage[1] );
+                    if ( isset( $idOfLanguage[$versionLanguage[1]] ) )
+                        $newAttribute->setAttribute( 'id', $idOfLanguage[$versionLanguage[1]] );
+                    $newAttribute->initialize();
+                    $newAttribute->store();
+                    $idOfLanguage[$versionLanguage[1]] = (int) $newAttribute->attribute( 'id' );
+                }
+            }
+
+            // The relation rows of relation attributes follow their attribute: those of a carried attribute are
+            // re-pointed at the new class attribute, those of a dropped one go (the restore point keeps them).
+            foreach ( $sourceClassDataMap as $identifier => $classAttribute )
+            {
+                $oldID = (int) $classAttribute->attribute( 'id' );
+                if ( isset( $carries[$identifier] ) )
+                    $db->query( 'UPDATE ezcontentobject_link SET contentclassattribute_id = ' . (int) $destClassDataMap[$carries[$identifier]]->attribute( 'id' ) .
+                                " WHERE from_contentobject_id = $sourceObjectID AND contentclassattribute_id = $oldID" );
+                else
+                    $db->query( "DELETE FROM ezcontentobject_link WHERE from_contentobject_id = $sourceObjectID AND contentclassattribute_id = $oldID" );
+            }
+
+            // Inside the transaction: if this fails the attribute moves above are rolled back with it.
             $sourceObject->setAttribute( 'contentclass_id', $destinationClassID );
             $sourceObject->store();
 
-            $db->commit();
+            if ( !$db->commit() )
+                throw new expChangeClassException( 'The transaction could not be committed.' );
         }
         catch ( Exception $e )
         {
             $db->rollback();
             $errorMessage = $e->getMessage();
-            eZDebug::writeError( "Conversion of object $sourceObjectID to class" .
-                                 " $destinationClassID rolled back: " . $e->getMessage(),
-                                 __METHOD__ );
+            eZDebug::writeError( "Conversion of object $sourceObjectID to class $destinationClassID rolled back: " . $e->getMessage(), __METHOD__ );
             return false;
         }
 
+        eZContentObject::clearCache( array( $sourceObjectID ) );
         eZContentCacheManager::clearContentCache( $sourceObjectID );
 
         return true;

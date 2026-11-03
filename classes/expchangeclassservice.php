@@ -82,9 +82,10 @@ class expChangeClassService
     {
         $db = eZDB::instance();
         $objectID = (int)$object->attribute( 'id' );
+        // every language a row exists for, in any version (eZContentObject::languages() keeps only the siteaccess's)
         $languages = array();
-        foreach ( (array)$object->languages() as $locale => $language )
-            $languages[] = (string)$locale;
+        foreach ( (array)$db->arrayQuery( "SELECT DISTINCT language_code FROM ezcontentobject_attribute WHERE contentobject_id = $objectID ORDER BY language_code" ) as $row )
+            $languages[] = (string)$row['language_code'];
         $versions = array();
         foreach ( (array)$db->arrayQuery( "SELECT version, status, creator_id FROM ezcontentobject_version WHERE contentobject_id = $objectID ORDER BY version" ) as $row )
             $versions[] = array( 'version' => (int)$row['version'], 'status' => (int)$row['status'], 'creator_id' => (int)$row['creator_id'] );

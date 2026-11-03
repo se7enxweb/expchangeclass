@@ -52,7 +52,8 @@ foreach ( $templates as $path => $source )
     if ( preg_match_all( '/class="([^"]*)"/', $source, $m ) )
         foreach ( $m[1] as $list )
             foreach ( preg_split( '/\s+/', trim( preg_replace( '/\{.*?\}/s', ' ', $list ) ) ) as $class )
-                if ( $class !== '' )
+                // "is-{$kind}" leaves "is-": a class made from a variable is not checked
+                if ( $class !== '' && substr( $class, -1 ) !== '-' )
                     $classes[$class][$path] = true;
 
 // IC-03
